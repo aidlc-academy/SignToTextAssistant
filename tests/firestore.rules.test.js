@@ -999,3 +999,273 @@ describe("Cancellation after refresh (rules perspective)", function () {
   });
 
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 16. ROOM MESSAGES — rooms/{roomId}/messages/{messageId}
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Room messages", function () {
+
+  // ── Helpers ────────────────────────────────────────────────────────────
+
+  /** Build a valid message document with the confirmed five-field schema. */
+  function makeMessage(senderUid, senderEmail, overrides = {}) {
+    return {
+      senderUid:   senderUid,
+      senderEmail: senderEmail,
+      text:        "HELLO",
+      type:        "gesture",
+      timestamp:   Timestamp.now(),
+      ...overrides,
+    };
+  }
+
+  /** Write an active room (both participants joined) as admin. */
+  async function setupActiveRoom(roomId) {
+    await adminWrite([{
+      path: ["rooms", roomId],
+      data: makeRoom(CREATOR_UID, INVITEE_EMAIL, {
+        participants: [CREATOR_UID, INVITEE_UID],
+        status:       "active",
+      }),
+    }]);
+  }
+
+  // ── Valid message creation ──────────────────────────────────────────────
+
+  it("creator (participant) can send a gesture message", async function () {
+    const ROOM_ID = "msg-create-creator-gesture";
+    await setupActiveRoom(ROOM_ID);
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "rooms", ROOM_ID, "messages", "m1"
+    );
+    await assertSucceeds(
+      setDoc(ref, makeMessage(CREATOR_UID, CREATOR_EMAIL))
+    );
+  });
+
+  it("invitee (participant) can send a text reply message", async function () {
+    const ROOM_ID = "msg-create-invitee-text";
+    await setupActiveRoom(ROOM_ID);
+    const ref = doc(
+      db(INVITEE_UID, INVITEE_EMAIL),
+      "rooms", ROOM_ID, "messages", "m2"
+    );
+    await assertSucceeds(
+      setDoc(ref, makeMessage(INVITEE_UID, INVITEE_EMAIL, {
+        text: "Hello back!",
+        type: "text",
+      }))
+    );
+  });
+
+  // ── Non-participant access ──────────────────────────────────────────────
+
+  it("non-participant cannot send a message", async function () {
+    const ROOM_ID = "msg-create-other";
+    await setupActiveRoom(ROOM_ID);
+    const ref = doc(
+      db(OTHER_UID, OTHER_EMAIL),
+      "rooms", ROOM_ID, "messages", "m3"
+    );
+    await assertFails(
+      setDoc(ref, makeMessage(OTHER_UID, OTHER_EMAIL))
+    );
+  });
+
+  it("unauthenticated user cannot send a message", async function () {
+    const ROOM_ID = "msg-create-anon";
+    await setupActiveRoom(ROOM_ID);
+    const ref = doc(anonDb(), "rooms", ROOM_ID, "messages", "m4");
+    await assertFails(
+      setDoc(ref, makeMessage(CREATOR_UID, CREATOR_EMAIL))
+    );
+  });
+
+  // ── senderUid identity enforcement ─────────────────────────────────────
+
+  it("participant cannot send a message with another user's senderUid", async function () {
+    const ROOM_ID = "msg-create-wronguid";
+    await setupActiveRoom(ROOM_ID);
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "rooms", ROOM_ID, "messages", "m5"
+    );
+    await assertFails(
+      setDoc(ref, makeMessage(INVITEE_UID, INVITEE_EMAIL))  // senderUid != callerUid
+    );
+  });
+
+  // ── Field validation ────────────────────────────────────────────────────
+
+  it("message with extra field is denied", async function () {
+    const ROOM_ID = "msg-extra-field";
+    await setupActiveRoom(ROOM_ID);
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "rooms", ROOM_ID, "messages", "m6"
+    );
+    await assertFails(
+      setDoc(ref, makeMessage(CREATOR_UID, CREATOR_EMAIL, { extra: true }))
+    );
+  });
+
+  it("message missing a required field is denied", async function () {
+    const ROOM_ID = "msg-missing-field";
+    await setupActiveRoom(ROOM_ID);
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "rooms", ROOM_ID, "messages", "m7"
+    );
+    // Omit 'type'
+    await assertFails(
+      setDoc(ref, {
+        senderUid:   CREATOR_UID,
+        senderEmail: CREATOR_EMAIL,
+        text:        "HELLO",
+        timestamp:   Timestamp.now(),
+      })
+    );
+  });
+
+  it("message with invalid type value is denied", async function () {
+    const ROOM_ID = "msg-bad-type";
+    await setupActiveRoom(ROOM_ID);
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "rooms", ROOM_ID, "messages", "m8"
+    );
+    await assertFails(
+      setDoc(ref, makeMessage(CREATOR_UID, CREATOR_EMAIL, { type: "video" }))
+    );
+  });
+
+  it("message with empty text is denied", async function () {
+    const ROOM_ID = "msg-empty-text";
+    await setupActiveRoom(ROOM_ID);
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "rooms", ROOM_ID, "messages", "m9"
+    );
+    await assertFails(
+      setDoc(ref, makeMessage(CREATOR_UID, CREATOR_EMAIL, { text: "" }))
+    );
+  });
+
+  it("message exceeding 500 characters is denied", async function () {
+    const ROOM_ID = "msg-too-long";
+    await setupActiveRoom(ROOM_ID);
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "rooms", ROOM_ID, "messages", "m10"
+    );
+    await assertFails(
+      setDoc(ref, makeMessage(CREATOR_UID, CREATOR_EMAIL, { text: "x".repeat(501) }))
+    );
+  });
+
+  it("message with timestamp as string is denied", async function () {
+    const ROOM_ID = "msg-bad-timestamp";
+    await setupActiveRoom(ROOM_ID);
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "rooms", ROOM_ID, "messages", "m11"
+    );
+    await assertFails(
+      setDoc(ref, makeMessage(CREATOR_UID, CREATOR_EMAIL, {
+        timestamp: new Date().toISOString(),  // string, not Timestamp
+      }))
+    );
+  });
+
+  // ── Read access ─────────────────────────────────────────────────────────
+
+  it("participant can read messages in their room", async function () {
+    const ROOM_ID = "msg-read-participant";
+    await setupActiveRoom(ROOM_ID);
+    // Write a message as admin, then read as participant
+    await adminWrite([{
+      path: ["rooms", ROOM_ID, "messages", "m12"],
+      data: makeMessage(CREATOR_UID, CREATOR_EMAIL),
+    }]);
+    const ref = doc(
+      db(INVITEE_UID, INVITEE_EMAIL),
+      "rooms", ROOM_ID, "messages", "m12"
+    );
+    await assertSucceeds(getDoc(ref));
+  });
+
+  it("non-participant cannot read messages", async function () {
+    const ROOM_ID = "msg-read-other";
+    await setupActiveRoom(ROOM_ID);
+    await adminWrite([{
+      path: ["rooms", ROOM_ID, "messages", "m13"],
+      data: makeMessage(CREATOR_UID, CREATOR_EMAIL),
+    }]);
+    const ref = doc(
+      db(OTHER_UID, OTHER_EMAIL),
+      "rooms", ROOM_ID, "messages", "m13"
+    );
+    await assertFails(getDoc(ref));
+  });
+
+  // ── Cross-room isolation ────────────────────────────────────────────────
+
+  it("participant of Room A cannot read messages in Room B", async function () {
+    const ROOM_A = "msg-cross-room-a";
+    const ROOM_B = "msg-cross-room-b";
+
+    // CREATOR + INVITEE are in Room A
+    await setupActiveRoom(ROOM_A);
+
+    // Room B has OTHER_UID as creator; CREATOR_UID is not a participant
+    await adminWrite([{
+      path: ["rooms", ROOM_B],
+      data: makeRoom(OTHER_UID, INVITEE_EMAIL, {
+        participants: [OTHER_UID],
+        status:       "waiting",
+      }),
+    }, {
+      path: ["rooms", ROOM_B, "messages", "m14"],
+      data: makeMessage(OTHER_UID, OTHER_EMAIL),
+    }]);
+
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "rooms", ROOM_B, "messages", "m14"
+    );
+    await assertFails(getDoc(ref));
+  });
+
+  // ── Immutability ────────────────────────────────────────────────────────
+
+  it("participant cannot update a sent message", async function () {
+    const ROOM_ID = "msg-update-denied";
+    await setupActiveRoom(ROOM_ID);
+    await adminWrite([{
+      path: ["rooms", ROOM_ID, "messages", "m15"],
+      data: makeMessage(CREATOR_UID, CREATOR_EMAIL),
+    }]);
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "rooms", ROOM_ID, "messages", "m15"
+    );
+    await assertFails(updateDoc(ref, { text: "modified" }));
+  });
+
+  it("participant cannot delete a sent message", async function () {
+    const ROOM_ID = "msg-delete-denied";
+    await setupActiveRoom(ROOM_ID);
+    await adminWrite([{
+      path: ["rooms", ROOM_ID, "messages", "m16"],
+      data: makeMessage(CREATOR_UID, CREATOR_EMAIL),
+    }]);
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "rooms", ROOM_ID, "messages", "m16"
+    );
+    await assertFails(deleteDoc(ref));
+  });
+
+});

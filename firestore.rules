@@ -252,6 +252,103 @@ service cloud.firestore {
       // Deletion would require a Cloud Function with Admin SDK privileges.
       // ─────────────────────────────────────────────────────────────────────
       allow delete: if false;
+
+
+      // ═══════════════════════════════════════════════════════════════════
+      // MESSAGES  (sub-collection of a room)
+      // Path: rooms/{roomId}/messages/{messageId}
+      //
+      // Fields written when a message is sent (planned frontend schema):
+      //   senderUid   : string    — UID of the sender
+      //   senderEmail : string    — sender's email (display only)
+      //   text        : string    — gesture label or typed reply
+      //   type        : string    — "gesture" | "text"
+      //   timestamp   : timestamp — serverTimestamp()
+      //
+      // Security design:
+      //   - Only the two room participants may read or write messages.
+      //   - isParticipant() defined on the parent block reads resource.data
+      //     which is scoped to the current document — inside a nested match
+      //     that is the *message* document, not the room. It cannot be reused.
+      //   - We therefore use a dedicated helper that reads the room document
+      //     via get() so we can inspect participants.
+      // ═══════════════════════════════════════════════════════════════════
+      match /messages/{messageId} {
+
+        // ─────────────────────────────────────────────────────────────────
+        // Helper: isRoomParticipant()
+        // Reads the parent room document to check whether the caller is
+        // one of its participants. Cannot reuse isParticipant() from the
+        // parent match block because resource.data in a sub-collection
+        // refers to the message document, not the room document.
+        // ─────────────────────────────────────────────────────────────────
+        function isRoomParticipant() {
+          let roomDoc = get(/databases/$(database)/documents/rooms/$(roomId));
+          return request.auth != null
+              && roomDoc != null
+              && request.auth.uid in roomDoc.data.participants;
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        // Helper: msgFieldsAreExact(d)
+        // The message document must contain exactly these five fields.
+        // keys().hasAll(required) — all five present.
+        // keys().hasOnly(required) — no extra fields allowed.
+        // ─────────────────────────────────────────────────────────────────
+        function msgFieldsAreExact(d) {
+          let required = ['senderUid', 'senderEmail', 'text', 'type', 'timestamp'];
+          return d.keys().hasAll(required) && d.keys().hasOnly(required);
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        // Helper: msgFieldTypesValid(d)
+        // Validates field types for message documents.
+        // ─────────────────────────────────────────────────────────────────
+        function msgFieldTypesValid(d) {
+          return d.senderUid   is string
+              && d.senderEmail is string
+              && d.text        is string
+              && d.type        is string
+              && d.timestamp   is timestamp;
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        // READ
+        //
+        // Only authenticated room participants may read messages.
+        // ─────────────────────────────────────────────────────────────────
+        allow read: if isRoomParticipant();
+
+        // ─────────────────────────────────────────────────────────────────
+        // CREATE
+        //
+        // Conditions enforced:
+        //   1. Caller must be an authenticated room participant.
+        //   2. Exact five-field schema — rejects extra or missing fields.
+        //   3. Field types are valid.
+        //   4. senderUid must equal the caller's own UID.
+        //      Prevents sending messages attributed to another user.
+        //   5. type must be "gesture" or "text" — no other values accepted.
+        //   6. text must be non-empty (at least 1 character).
+        //   7. text must not exceed 500 characters.
+        //      Prevents extremely long messages from abusing storage.
+        // ─────────────────────────────────────────────────────────────────
+        allow create: if isRoomParticipant()
+                      && msgFieldsAreExact(request.resource.data)
+                      && msgFieldTypesValid(request.resource.data)
+                      && request.resource.data.senderUid   == request.auth.uid
+                      && request.resource.data.type        in ['gesture', 'text']
+                      && request.resource.data.text.size() >= 1
+                      && request.resource.data.text.size() <= 500;
+
+        // ─────────────────────────────────────────────────────────────────
+        // UPDATE and DELETE — never permitted
+        //
+        // Messages are immutable once written. Neither participants nor
+        // anyone else may modify or delete message documents via the client.
+        // ─────────────────────────────────────────────────────────────────
+        allow update, delete: if false;
+      }
     }
 
 

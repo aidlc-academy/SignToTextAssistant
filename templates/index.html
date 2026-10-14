@@ -452,7 +452,14 @@
         expires.className = "invite-expires";
         if (invite.expiresAt) {
           try {
-            expires.textContent = `Expires: ${new Date(invite.expiresAt).toLocaleString()}`;
+            // invite.expiresAt is a Firestore Timestamp ({seconds, nanoseconds}).
+            // Convert to milliseconds before passing to Date so the display
+            // is correct regardless of whether the value is a Timestamp object
+            // or (defensively) a plain number/string.
+            const ms = (invite.expiresAt && typeof invite.expiresAt.seconds === "number")
+              ? invite.expiresAt.seconds * 1000
+              : Number(invite.expiresAt);
+            expires.textContent = `Expires: ${new Date(ms).toLocaleString()}`;
           } catch { expires.textContent = ""; }
         }
 
