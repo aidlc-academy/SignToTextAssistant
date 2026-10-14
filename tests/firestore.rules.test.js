@@ -90,13 +90,15 @@ function makeRoom(creatorUid, inviteeEmail, overrides = {}) {
 /**
  * Build a valid invitation document as room.js createRoom() writes it.
  * Fields: roomId, invitedBy, createdAt, expiresAt
+ * expiresAt is a Firestore Timestamp (changed from ISO string) so the
+ * rules can enforce expiry with request.time < resource.data.expiresAt.
  */
 function makeInvite(roomId, creatorEmail, overrides = {}) {
   return {
     roomId:    roomId,
     invitedBy: creatorEmail,
     createdAt: Timestamp.now(),
-    expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+    expiresAt: Timestamp.fromDate(new Date(Date.now() + 86_400_000)),
     ...overrides,
   };
 }
@@ -735,4 +737,265 @@ describe("Invitation deletion", function () {
     );
     await assertFails(deleteDoc(ref));
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 11. INVITATION EXPIRY
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Invitation expiry", function () {
+
+  it("invitee can read a non-expired invitation", async function () {
+    const ROOM_ID = "room-expiry-valid";
+    await setupRoomWithInvite(
+      ROOM_ID,
+      makeRoom(CREATOR_UID, INVITEE_EMAIL),
+      makeInvite(ROOM_ID, CREATOR_EMAIL)
+    );
+    const ref = doc(
+      db(INVITEE_UID, INVITEE_EMAIL),
+      "invitations", INVITEE_HASH, "pendingInvites", ROOM_ID
+    );
+    await assertSucceeds(getDoc(ref));
+  });
+
+  it("invitee cannot read an expired invitation", async function () {
+    const ROOM_ID = "room-expiry-expired-read";
+    await setupRoomWithInvite(
+      ROOM_ID,
+      makeRoom(CREATOR_UID, INVITEE_EMAIL),
+      makeInvite(ROOM_ID, CREATOR_EMAIL, {
+        expiresAt: Timestamp.fromDate(new Date(Date.now() - 2_000)),
+      })
+    );
+    const ref = doc(
+      db(INVITEE_UID, INVITEE_EMAIL),
+      "invitations", INVITEE_HASH, "pendingInvites", ROOM_ID
+    );
+    await assertFails(getDoc(ref));
+  });
+
+  it("expired invitation cannot be used to join a room", async function () {
+    const ROOM_ID = "room-expiry-expired-join";
+    await setupRoomWithInvite(
+      ROOM_ID,
+      makeRoom(CREATOR_UID, INVITEE_EMAIL),
+      makeInvite(ROOM_ID, CREATOR_EMAIL, {
+        expiresAt: Timestamp.fromDate(new Date(Date.now() - 2_000)),
+      })
+    );
+    const ref = doc(db(INVITEE_UID, INVITEE_EMAIL), "rooms", ROOM_ID);
+    await assertFails(
+      updateDoc(ref, {
+        participants: [CREATOR_UID, INVITEE_UID],
+        status:       "active",
+      })
+    );
+  });
+
+  it("creator cannot create an invitation with expiresAt in the past", async function () {
+    const ROOM_ID = "room-expiry-past-create";
+    await setupRoom(ROOM_ID, makeRoom(CREATOR_UID, INVITEE_EMAIL));
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "invitations", INVITEE_HASH, "pendingInvites", ROOM_ID
+    );
+    await assertFails(
+      setDoc(ref, makeInvite(ROOM_ID, CREATOR_EMAIL, {
+        expiresAt: Timestamp.fromDate(new Date(Date.now() - 1_000)),
+      }))
+    );
+  });
+
+  it("creator cannot create an invitation expiring more than 24 hours from now", async function () {
+    const ROOM_ID = "room-expiry-toolong";
+    await setupRoom(ROOM_ID, makeRoom(CREATOR_UID, INVITEE_EMAIL));
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "invitations", INVITEE_HASH, "pendingInvites", ROOM_ID
+    );
+    await assertFails(
+      setDoc(ref, makeInvite(ROOM_ID, CREATOR_EMAIL, {
+        expiresAt: Timestamp.fromDate(new Date(Date.now() + 25 * 60 * 60 * 1000)),
+      }))
+    );
+  });
+
+  it("invitation with expiresAt as a string is denied (wrong type)", async function () {
+    const ROOM_ID = "room-expiry-string-type";
+    await setupRoom(ROOM_ID, makeRoom(CREATOR_UID, INVITEE_EMAIL));
+    const ref = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "invitations", INVITEE_HASH, "pendingInvites", ROOM_ID
+    );
+    await assertFails(
+      setDoc(ref, makeInvite(ROOM_ID, CREATOR_EMAIL, {
+        expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+      }))
+    );
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 12. ACTIVE AND ENDED ROOM READS
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Active and ended room reads", function () {
+
+  it("creator can read an active room", async function () {
+    const ROOM_ID = "room-active-read-creator";
+    await setupRoom(ROOM_ID, makeRoom(CREATOR_UID, INVITEE_EMAIL, {
+      participants: [CREATOR_UID, INVITEE_UID],
+      status: "active",
+    }));
+    const ref = doc(db(CREATOR_UID, CREATOR_EMAIL), "rooms", ROOM_ID);
+    await assertSucceeds(getDoc(ref));
+  });
+
+  it("invitee can read an active room as participant", async function () {
+    const ROOM_ID = "room-active-read-invitee";
+    await setupRoom(ROOM_ID, makeRoom(CREATOR_UID, INVITEE_EMAIL, {
+      participants: [CREATOR_UID, INVITEE_UID],
+      status: "active",
+    }));
+    const ref = doc(db(INVITEE_UID, INVITEE_EMAIL), "rooms", ROOM_ID);
+    await assertSucceeds(getDoc(ref));
+  });
+
+  it("unrelated user cannot read an active room", async function () {
+    const ROOM_ID = "room-active-read-other";
+    await setupRoom(ROOM_ID, makeRoom(CREATOR_UID, INVITEE_EMAIL, {
+      participants: [CREATOR_UID, INVITEE_UID],
+      status: "active",
+    }));
+    const ref = doc(db(OTHER_UID, OTHER_EMAIL), "rooms", ROOM_ID);
+    await assertFails(getDoc(ref));
+  });
+
+  it("creator can read an ended room", async function () {
+    const ROOM_ID = "room-ended-read-creator";
+    await setupRoom(ROOM_ID, makeRoom(CREATOR_UID, INVITEE_EMAIL, {
+      participants: [CREATOR_UID, INVITEE_UID],
+      status: "ended",
+    }));
+    const ref = doc(db(CREATOR_UID, CREATOR_EMAIL), "rooms", ROOM_ID);
+    await assertSucceeds(getDoc(ref));
+  });
+
+  it("invitee can read an ended room as participant", async function () {
+    const ROOM_ID = "room-ended-read-invitee";
+    await setupRoom(ROOM_ID, makeRoom(CREATOR_UID, INVITEE_EMAIL, {
+      participants: [CREATOR_UID, INVITEE_UID],
+      status: "ended",
+    }));
+    const ref = doc(db(INVITEE_UID, INVITEE_EMAIL), "rooms", ROOM_ID);
+    await assertSucceeds(getDoc(ref));
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 13. CROSS-ROOM INVITATION REUSE
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Cross-room invitation reuse", function () {
+
+  it("invitee with invitation for Room A cannot join Room B", async function () {
+    const ROOM_A = "room-cross-a";
+    const ROOM_B = "room-cross-b";
+    // Room A: valid invitation for invitee
+    await setupRoomWithInvite(
+      ROOM_A,
+      makeRoom(CREATOR_UID, INVITEE_EMAIL),
+      makeInvite(ROOM_A, CREATOR_EMAIL)
+    );
+    // Room B: no invitation, but same inviteeEmail
+    await setupRoom(ROOM_B, makeRoom(CREATOR_UID, INVITEE_EMAIL));
+    // Invitee tries to join Room B — callerHasInvitation() checks pendingInvites/ROOM_B
+    const ref = doc(db(INVITEE_UID, INVITEE_EMAIL), "rooms", ROOM_B);
+    await assertFails(
+      updateDoc(ref, {
+        participants: [CREATOR_UID, INVITEE_UID],
+        status:       "active",
+      })
+    );
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 14. JOINING A ROOM WITH AN ENDED ROOM
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Joining an ended room", function () {
+
+  it("invitee cannot join a room that is already ended", async function () {
+    const ROOM_ID = "room-join-ended";
+    // Room is ended (e.g. creator cancelled before invitee accepted)
+    await setupRoomWithInvite(
+      ROOM_ID,
+      makeRoom(CREATOR_UID, INVITEE_EMAIL, { status: "ended" }),
+      makeInvite(ROOM_ID, CREATOR_EMAIL)
+    );
+    const ref = doc(db(INVITEE_UID, INVITEE_EMAIL), "rooms", ROOM_ID);
+    await assertFails(
+      updateDoc(ref, {
+        participants: [CREATOR_UID, INVITEE_UID],
+        status:       "active",
+      })
+    );
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 15. CANCELLATION AFTER REFRESH (rules-side: ended room operations)
+// ═══════════════════════════════════════════════════════════════════════════
+// Note: the full cancelRoom() refresh-recovery path runs inside room.js and
+// uses getDoc + updateDoc + deleteDoc in sequence. The rules-side behaviour
+// tested here is: a creator who recovers inviteeEmail from Firestore can still
+// end a waiting room and delete its invitation — i.e., the rules allow these
+// operations regardless of whether the creator's in-memory state was lost.
+
+describe("Cancellation after refresh (rules perspective)", function () {
+
+  it("creator can end a waiting room (simulates cancelRoom step 1)", async function () {
+    const ROOM_ID = "room-refresh-cancel-end";
+    await setupRoom(ROOM_ID, makeRoom(CREATOR_UID, INVITEE_EMAIL));
+    const ref = doc(db(CREATOR_UID, CREATOR_EMAIL), "rooms", ROOM_ID);
+    await assertSucceeds(updateDoc(ref, { status: "ended" }));
+  });
+
+  it("creator can delete invitation after ending room (simulates cancelRoom step 2)", async function () {
+    const ROOM_ID = "room-refresh-cancel-invite";
+    await setupRoomWithInvite(
+      ROOM_ID,
+      makeRoom(CREATOR_UID, INVITEE_EMAIL, { status: "ended" }),
+      makeInvite(ROOM_ID, CREATOR_EMAIL)
+    );
+    const invRef = doc(
+      db(CREATOR_UID, CREATOR_EMAIL),
+      "invitations", INVITEE_HASH, "pendingInvites", ROOM_ID
+    );
+    await assertSucceeds(deleteDoc(invRef));
+  });
+
+  it("stale invitation on an ended room cannot be accepted", async function () {
+    const ROOM_ID = "room-refresh-stale-invite";
+    // Room is ended; invitation still exists (cleanup failed)
+    await setupRoomWithInvite(
+      ROOM_ID,
+      makeRoom(CREATOR_UID, INVITEE_EMAIL, { status: "ended" }),
+      makeInvite(ROOM_ID, CREATOR_EMAIL)
+    );
+    const roomRef = doc(db(INVITEE_UID, INVITEE_EMAIL), "rooms", ROOM_ID);
+    await assertFails(
+      updateDoc(roomRef, {
+        participants: [CREATOR_UID, INVITEE_UID],
+        status:       "active",
+      })
+    );
+  });
+
 });

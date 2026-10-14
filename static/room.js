@@ -50,7 +50,8 @@ import { getFirestore,
          where,
          getDocs,
          onSnapshot,
-         serverTimestamp }
+         serverTimestamp,
+         Timestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -148,16 +149,39 @@ async function createRoom(creatorUid, creatorEmail, inviteeEmail) {
 
     const roomId = roomRef.id;
 
-    // 2. Write the invitation under the hash of the invitee's email
+    // 2. Write the invitation under the hash of the invitee's email.
+    //    expiresAt is stored as a Firestore Timestamp so the rules can
+    //    enforce expiry with request.time < resource.data.expiresAt.
     const emailHash = await sha256hex(normInvitee);
     const inviteRef = doc(db, "invitations", emailHash, "pendingInvites", roomId);
 
-    await setDoc(inviteRef, {
-      roomId:      roomId,
-      invitedBy:   creatorEmail,          // display name for the invitee UI
-      createdAt:   serverTimestamp(),
-      expiresAt:   new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    });
+    try {
+      await setDoc(inviteRef, {
+        roomId:      roomId,
+        invitedBy:   creatorEmail,          // display name for the invitee UI
+        createdAt:   serverTimestamp(),
+        expiresAt:   Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+      });
+    } catch (inviteErr) {
+      // Invitation write failed — mark the room as ended so it cannot be joined.
+      // We do not attempt deleteDoc because room deletion is blocked by rules.
+      console.error("[room] createRoom: invitation write failed, marking room ended.", inviteErr.message);
+      try {
+        await updateDoc(roomRef, { status: "ended" });
+        console.info("[room] createRoom: orphaned room marked ended:", roomId);
+      } catch (cleanupErr) {
+        // Double failure: room is waiting with no invitation and could not be ended.
+        // It cannot be joined (no invitation exists), but it will remain in Firestore
+        // until the creator manually cancels via cancelRoom().
+        console.error(
+          "[room] createRoom CRITICAL: room orphaned in 'waiting' state. " +
+          "Manual cleanup required. roomId:", roomId,
+          "| inviteErr:", inviteErr.message,
+          "| cleanupErr:", cleanupErr.message
+        );
+      }
+      return { ok: false, error: "Could not send invitation. Please try again." };
+    }
 
     return { ok: true, roomId };
 
@@ -331,24 +355,56 @@ function listenToRoom(roomId, onStatus, onError) {
 
 /**
  * Cancel a waiting room created by the signed-in user.
- * Also deletes the outstanding invitation document.
+ *
+ * Safe operation order:
+ *   1. End the room FIRST so that even if the invitation delete fails,
+ *      the stale invitation cannot be used to join (join rule requires
+ *      status == "waiting").
+ *   2. Then delete the invitation (best-effort).
+ *
+ * If inviteeEmail is not provided (e.g. after a page refresh loses
+ * in-memory state), the email is recovered from the room document.
  *
  * @param {string} creatorUid
  * @param {string} roomId
- * @param {string} inviteeEmail  Stored on the room document
+ * @param {string|null|undefined} inviteeEmail  May be null after page refresh
  */
 async function cancelRoom(creatorUid, roomId, inviteeEmail) {
   try {
-    // Delete the invitation first
-    if (inviteeEmail) {
-      const emailHash = await sha256hex(normaliseEmail(inviteeEmail));
-      const inviteRef = doc(db, "invitations", emailHash, "pendingInvites", roomId);
-      await deleteDoc(inviteRef).catch(() => { /* may already be gone */ });
+    const roomRef = doc(db, "rooms", roomId);
+
+    // Recover inviteeEmail from Firestore if it was lost (e.g. page refresh)
+    let normEmail = inviteeEmail ? normaliseEmail(inviteeEmail) : null;
+    if (!normEmail) {
+      const roomSnap = await getDoc(roomRef);
+      if (!roomSnap.exists()) {
+        console.warn("[room] cancelRoom: room not found:", roomId);
+        return;
+      }
+      normEmail = roomSnap.data().inviteeEmail ?? null;
+      if (!normEmail) {
+        console.warn("[room] cancelRoom: room has no inviteeEmail, invitation cleanup skipped.");
+      }
     }
 
-    // Mark room as ended (rules: only creator can set status="ended")
-    const roomRef = doc(db, "rooms", roomId);
+    // Step 1: End the room FIRST.
+    // Once ended, any stale invitation is harmless — the join rule requires
+    // status == "waiting", which will now fail.
     await updateDoc(roomRef, { status: "ended" });
+
+    // Step 2: Delete the invitation (best-effort).
+    // If this fails, the invitation remains visible to the invitee but
+    // cannot be accepted because the room is ended.
+    if (normEmail) {
+      const emailHash = await sha256hex(normEmail);
+      const inviteRef = doc(db, "invitations", emailHash, "pendingInvites", roomId);
+      await deleteDoc(inviteRef).catch((err) => {
+        console.warn(
+          "[room] cancelRoom: invitation cleanup failed (room is ended, safe to ignore).",
+          err.message
+        );
+      });
+    }
 
   } catch (err) {
     console.error("[room] cancelRoom failed:", err.code, err.message);

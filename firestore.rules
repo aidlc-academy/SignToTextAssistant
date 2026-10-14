@@ -70,22 +70,23 @@ service cloud.firestore {
 
       // ─────────────────────────────────────────────────────────────────────
       // Helper: callerHasInvitation()
-      // True when a Firestore invitation document exists at the path derived
-      // from the caller's own authenticated email.
+      // True when a valid, non-expired invitation document exists for the
+      // caller at the path derived from their own authenticated email.
       //
-      // Executed server-side: hashing.sha256() receives the email from the
-      // verified JWT token — the client cannot forge this value.
+      // Uses get() instead of exists() so we can also read the expiresAt
+      // field and enforce expiry here — ensuring an expired invitation
+      // cannot be used to join even if the document still exists in Firestore.
       //
-      // hashing.sha256(string).toHexString() produces UPPERCASE hex,
-      // matching sha256hex() in room.js after the .toUpperCase() fix.
+      // If the document does not exist, get() returns null and the null-check
+      // short-circuits before accessing .data, so no null-dereference error occurs.
       //
       // Path is a single unbroken string (line-breaks inside path literals
       // are not valid Security Rules syntax).
       // ─────────────────────────────────────────────────────────────────────
       function callerHasInvitation() {
-        return exists(
-          /databases/$(database)/documents/invitations/$(hashing.sha256(request.auth.token.email.lower()).toHexString())/pendingInvites/$(roomId)
-        );
+        let inviteDoc = get(/databases/$(database)/documents/invitations/$(hashing.sha256(request.auth.token.email.lower()).toHexString())/pendingInvites/$(roomId));
+        return inviteDoc != null
+            && request.time < inviteDoc.data.expiresAt;
       }
 
       // ─────────────────────────────────────────────────────────────────────
@@ -270,7 +271,7 @@ service cloud.firestore {
     //   roomId    : string    — the Firestore-generated room document ID
     //   invitedBy : string    — creator's email address (display only)
     //   createdAt : timestamp — serverTimestamp()
-    //   expiresAt : string    — ISO-8601 datetime string (+24 h)
+    //   expiresAt : timestamp — Firestore Timestamp 24 hours after creation
     // ═══════════════════════════════════════════════════════════════════════
     match /invitations/{emailHash}/pendingInvites/{inviteId} {
 
@@ -286,12 +287,14 @@ service cloud.firestore {
       // ─────────────────────────────────────────────────────────────────────
       // Helper: inviteFieldTypesValid(d)
       // Field types confirmed from room.js setDoc call.
+      // expiresAt is now stored as a Firestore Timestamp (changed from string)
+      // so that request.time < resource.data.expiresAt is a valid comparison.
       // ─────────────────────────────────────────────────────────────────────
       function inviteFieldTypesValid(d) {
         return d.roomId    is string
             && d.invitedBy is string
             && d.createdAt is timestamp
-            && d.expiresAt is string;
+            && d.expiresAt is timestamp;
       }
 
       // ─────────────────────────────────────────────────────────────────────
@@ -319,16 +322,17 @@ service cloud.firestore {
       // READ
       //
       // Only the user whose authenticated email hashes to {emailHash} may
-      // read their invitations.
+      // read their invitations, AND the invitation must not have expired.
       //
       // hashing.sha256(email).toHexString() is evaluated by Firestore against
       // the verified JWT — the client cannot supply a forged hash.
-      // A user who knows someone else's email still cannot satisfy this rule
-      // because it hashes the CALLER'S OWN email from the token.
+      // request.time < resource.data.expiresAt enforces the 24-hour expiry:
+      // both values are Firestore Timestamps, so < is a valid comparison.
       // ─────────────────────────────────────────────────────────────────────
       allow read: if request.auth != null
                   && hashing.sha256(request.auth.token.email.lower()).toHexString()
-                     == emailHash;
+                     == emailHash
+                  && request.time < resource.data.expiresAt;
 
       // ─────────────────────────────────────────────────────────────────────
       // CREATE
@@ -336,7 +340,7 @@ service cloud.firestore {
       // Enforced conditions:
       //   1. Caller must be authenticated.
       //   2. Exact four-field schema — no extra or missing fields.
-      //   3. Field types are valid.
+      //   3. Field types are valid (expiresAt must be a Timestamp).
       //   4. The referenced room (inviteId == roomId) must exist.
       //      Prevents invitations for non-existent rooms.
       //   5. The caller must be the room's creator.
@@ -351,6 +355,12 @@ service cloud.firestore {
       //   8. The roomId field inside the document must match inviteId.
       //      Prevents the creator writing an invitation document whose
       //      roomId field points to a different room.
+      //   9. expiresAt must be in the future (> request.time).
+      //      Prevents creation of already-expired invitations.
+      //  10. expiresAt must be at most 24 hours from now.
+      //      Prevents unbounded invitation lifetimes.
+      //      Enforced using toMillis() integer arithmetic (verified approach):
+      //        expiresAt.toMillis() <= request.time.toMillis() + 86400000
       //
       // getRoomData() is called once; its result is reused across conditions
       // 5, 6, and 7 within the same rule evaluation.
@@ -363,7 +373,10 @@ service cloud.firestore {
                     && getRoomData().status    == "waiting"
                     && hashing.sha256(getRoomData().inviteeEmail).toHexString()
                        == emailHash
-                    && request.resource.data.roomId == inviteId;
+                    && request.resource.data.roomId == inviteId
+                    && request.resource.data.expiresAt > request.time
+                    && request.resource.data.expiresAt.toMillis()
+                       <= request.time.toMillis() + 86400000;
 
       // ─────────────────────────────────────────────────────────────────────
       // DELETE
