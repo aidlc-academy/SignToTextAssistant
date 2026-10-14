@@ -1,0 +1,8 @@
+# Core dependencies
+mediapipe>=1.1.0       # Hand landmark detection (also installs OpenCV automatically)
+
+# Web interface
+flask>=3.1.0           # Web framework that serves the browser UI and video stream
+
+# Optional: text-to-speech feature
+pyttsx3>=2.90          # Converts recognised gesture text to spoken audio (works offline)

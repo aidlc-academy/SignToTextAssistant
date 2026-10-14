@@ -1,0 +1,405 @@
+rules_version = '2';
+//
+// Firestore Security Rules — Sign-to-Text Communication Assistant
+// ==============================================================
+//
+// Collections covered:
+//   users/{userId}/translations/{translationId}  — personal gesture history
+//   rooms/{roomId}                               — online communication rooms
+//   invitations/{emailHash}/pendingInvites/{inviteId}  — room invitations
+//
+// Field names and types are taken directly from static/room.js (confirmed).
+//
+// Hash compatibility:
+//   sha256hex() in room.js produces UPPERCASE hex (.toUpperCase() is applied).
+//   hashing.sha256(string).toHexString() in these rules also produces UPPERCASE hex.
+//   Both sides are compatible.
+//
+// These rules have NOT been tested with the Firestore Emulator.
+// They must be validated before deployment.
+//
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PERSONAL TRANSLATION HISTORY
+    // Path: users/{userId}/translations/{translationId}
+    //
+    // Requirement: each authenticated user may only access their own history.
+    // No change from the existing working rule.
+    // ═══════════════════════════════════════════════════════════════════════
+    match /users/{userId}/translations/{translationId} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == userId;
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ROOMS
+    // Path: rooms/{roomId}
+    //
+    // Fields written by room.js (all confirmed):
+    //
+    //   CREATE  (addDoc):
+    //     createdBy    : string    — UID of the room creator
+    //     participants : list      — [creatorUid] initially; grows to 2 on join
+    //     inviteeEmail : string    — normalised lowercase email of invited user
+    //     status       : string    — "waiting" initially
+    //     createdAt    : timestamp — serverTimestamp()
+    //
+    //   UPDATE (acceptInvite / updateDoc):
+    //     participants : list      — [creatorUid, inviteeUid]
+    //     status       : string    — "active"
+    //
+    //   UPDATE (cancelRoom / updateDoc):
+    //     status       : string    — "ended"
+    // ═══════════════════════════════════════════════════════════════════════
+    match /rooms/{roomId} {
+
+      // ─────────────────────────────────────────────────────────────────────
+      // Helper: isParticipant()
+      // True when the caller's UID is in the stored participants list.
+      // Used for reads by the creator after creation, and by both users after
+      // joining; also used for the end-room transition.
+      // ─────────────────────────────────────────────────────────────────────
+      function isParticipant() {
+        return request.auth != null
+            && request.auth.uid in resource.data.participants;
+      }
+
+      // ─────────────────────────────────────────────────────────────────────
+      // Helper: callerHasInvitation()
+      // True when a Firestore invitation document exists at the path derived
+      // from the caller's own authenticated email.
+      //
+      // Executed server-side: hashing.sha256() receives the email from the
+      // verified JWT token — the client cannot forge this value.
+      //
+      // hashing.sha256(string).toHexString() produces UPPERCASE hex,
+      // matching sha256hex() in room.js after the .toUpperCase() fix.
+      //
+      // Path is a single unbroken string (line-breaks inside path literals
+      // are not valid Security Rules syntax).
+      // ─────────────────────────────────────────────────────────────────────
+      function callerHasInvitation() {
+        return exists(
+          /databases/$(database)/documents/invitations/$(hashing.sha256(request.auth.token.email.lower()).toHexString())/pendingInvites/$(roomId)
+        );
+      }
+
+      // ─────────────────────────────────────────────────────────────────────
+      // Helper: roomFieldsAreExact(d)
+      // Enforces that a room document contains exactly the five expected
+      // fields — no more, no fewer.
+      //
+      // keys().hasAll(required) — all five fields must be present.
+      // keys().hasOnly(required) — no additional fields are permitted.
+      //
+      // Source: firebase.google.com/docs/firestore/enterprise/security/rules-fields
+      // ─────────────────────────────────────────────────────────────────────
+      function roomFieldsAreExact(d) {
+        let required = ['createdBy', 'participants', 'inviteeEmail',
+                        'status', 'createdAt'];
+        return d.keys().hasAll(required) && d.keys().hasOnly(required);
+      }
+
+      // ─────────────────────────────────────────────────────────────────────
+      // Helper: roomFieldTypesValid(d)
+      // Validates field types against the schema room.js writes.
+      // Note: list generics are not supported — we check the list type and
+      // first element type only.
+      // ─────────────────────────────────────────────────────────────────────
+      function roomFieldTypesValid(d) {
+        return d.createdBy    is string
+            && d.participants is list
+            && d.participants.size() >= 1
+            && d.participants[0]     is string
+            && d.inviteeEmail        is string
+            && d.status              is string
+            && d.createdAt           is timestamp;
+      }
+
+      // ─────────────────────────────────────────────────────────────────────
+      // CREATE
+      //
+      // Conditions enforced:
+      //   1. Caller must be authenticated.
+      //   2. Exact five-field schema — rejects extra or missing fields.
+      //   3. Field types match room.js schema.
+      //   4. createdBy must equal the caller's UID.
+      //   5. participants must be exactly [callerUid] (size 1, index 0).
+      //   6. status must be "waiting".
+      //   7. inviteeEmail must be a non-empty string.
+      //   8. inviteeEmail must not equal the creator's own email — server-side
+      //      self-invite prevention (mirrors the client-side guard in room.js).
+      // ─────────────────────────────────────────────────────────────────────
+      allow create: if request.auth != null
+                    && roomFieldsAreExact(request.resource.data)
+                    && roomFieldTypesValid(request.resource.data)
+                    && request.resource.data.createdBy            == request.auth.uid
+                    && request.resource.data.participants.size()  == 1
+                    && request.resource.data.participants[0]      == request.auth.uid
+                    && request.resource.data.status               == "waiting"
+                    && request.resource.data.inviteeEmail.size()  > 0
+                    && request.resource.data.inviteeEmail         != request.auth.token.email.lower();
+
+      // ─────────────────────────────────────────────────────────────────────
+      // READ
+      //
+      // Two permitted reader categories:
+      //
+      //   A — isParticipant(): the creator from the moment of creation, and
+      //       both users once the invitee has joined. Covers listenToRoom()
+      //       by the creator and all post-join reads.
+      //
+      //   B — callerHasInvitation(): the intended invitee before joining.
+      //       Required because acceptInvite() in room.js reads the room
+      //       (step 1) BEFORE the updateDoc (step 2). At the time of that
+      //       read the invitee is not yet in participants, so isParticipant()
+      //       alone would deny the read. callerHasInvitation() provides the
+      //       server-side gate for this pre-join read.
+      // ─────────────────────────────────────────────────────────────────────
+      allow read: if request.auth != null
+                  && (isParticipant() || callerHasInvitation());
+
+      // ─────────────────────────────────────────────────────────────────────
+      // UPDATE — two permitted transitions only
+      //
+      // Any update that does not match either transition is denied.
+      // ─────────────────────────────────────────────────────────────────────
+      allow update: if request.auth != null && (
+
+        // ───────────────────────────────────────────────────────────────────
+        // Transition 1: Invitee joins  (waiting → active)
+        //
+        // Confirmed fields changed by room.js acceptInvite updateDoc:
+        //   participants  — grows from [creatorUid] to [creatorUid, inviteeUid]
+        //   status        — changes from "waiting" to "active"
+        //
+        // Enforced conditions:
+        //   a. Stored status is "waiting" (only one join is possible).
+        //   b. Stored participants has exactly one entry (the creator alone).
+        //   c. Caller is not the creator.
+        //   d. Caller's authenticated email equals stored inviteeEmail.
+        //      This is the direct identity check — ties the JWT token to
+        //      the field the creator entered.
+        //   e. Caller holds a valid invitation (server-side exists() check).
+        //   f. New status is "active".
+        //   g. New participants has exactly two entries.
+        //   h. New participants contains both the creator's UID and the
+        //      caller's UID. With size() == 2 and hasAll([both UIDs]) this
+        //      proves the new list is exactly {createdBy, callerUid} — no
+        //      injection of a third UID is possible.
+        //   i. Immutable fields createdBy, inviteeEmail, createdAt unchanged.
+        //   j. Only participants and status are allowed to change.
+        //      affectedKeys().hasOnly() checks the diff of future vs current
+        //      document and is the correct method for update-field restriction
+        //      (request.resource.data.keys() returns ALL fields on an update,
+        //      not just changed ones — the diff is required per Firebase docs).
+        (
+          resource.data.status               == "waiting"
+          && resource.data.participants.size() == 1
+          && resource.data.participants[0]     == resource.data.createdBy
+          && request.auth.uid                  != resource.data.createdBy
+          && request.auth.token.email.lower()  == resource.data.inviteeEmail
+          && callerHasInvitation()
+          && request.resource.data.status               == "active"
+          && request.resource.data.participants.size()  == 2
+          && request.resource.data.participants.hasAll([resource.data.createdBy,
+                                                        request.auth.uid])
+          && request.resource.data.createdBy    == resource.data.createdBy
+          && request.resource.data.inviteeEmail == resource.data.inviteeEmail
+          && request.resource.data.createdAt    == resource.data.createdAt
+          && request.resource.data.diff(resource.data)
+               .affectedKeys().hasOnly(['participants', 'status'])
+        )
+
+        ||
+
+        // ───────────────────────────────────────────────────────────────────
+        // Transition 2: Participant ends the room  (waiting|active → ended)
+        //
+        // Confirmed field changed by room.js cancelRoom updateDoc:
+        //   status — set to "ended"
+        //
+        // Enforced conditions:
+        //   a. Caller must be a current participant (isParticipant()).
+        //   b. Stored status is "waiting" or "active" — explicitly prevents
+        //      modifying an already-ended room in any way.
+        //   c. New status is "ended".
+        //   d. Only the status field changes.
+        //   e. All other fields remain identical.
+        // ───────────────────────────────────────────────────────────────────
+        (
+          isParticipant()
+          && (resource.data.status == "waiting" || resource.data.status == "active")
+          && request.resource.data.status               == "ended"
+          && request.resource.data.diff(resource.data)
+               .affectedKeys().hasOnly(['status'])
+          && request.resource.data.participants  == resource.data.participants
+          && request.resource.data.createdBy     == resource.data.createdBy
+          && request.resource.data.inviteeEmail  == resource.data.inviteeEmail
+          && request.resource.data.createdAt     == resource.data.createdAt
+        )
+      );
+
+      // ─────────────────────────────────────────────────────────────────────
+      // DELETE — never permitted via the client SDK
+      //
+      // Ended rooms remain as an audit trail.
+      // Deletion would require a Cloud Function with Admin SDK privileges.
+      // ─────────────────────────────────────────────────────────────────────
+      allow delete: if false;
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // INVITATIONS
+    // Path: invitations/{emailHash}/pendingInvites/{inviteId}
+    //
+    // emailHash  = uppercase hex SHA-256 of the normalised invitee email.
+    //              sha256hex() in room.js produces uppercase (confirmed).
+    //              hashing.sha256().toHexString() in rules produces uppercase.
+    //              Both sides are compatible.
+    //
+    // inviteId   = the roomId (confirmed: room.js uses doc(..., roomId) as
+    //              the document ID — inviteId and roomId are always equal).
+    //
+    // Fields written by room.js createRoom setDoc (confirmed):
+    //   roomId    : string    — the Firestore-generated room document ID
+    //   invitedBy : string    — creator's email address (display only)
+    //   createdAt : timestamp — serverTimestamp()
+    //   expiresAt : string    — ISO-8601 datetime string (+24 h)
+    // ═══════════════════════════════════════════════════════════════════════
+    match /invitations/{emailHash}/pendingInvites/{inviteId} {
+
+      // ─────────────────────────────────────────────────────────────────────
+      // Helper: inviteFieldsAreExact(d)
+      // Exact four-field schema for invitation documents.
+      // ─────────────────────────────────────────────────────────────────────
+      function inviteFieldsAreExact(d) {
+        let required = ['roomId', 'invitedBy', 'createdAt', 'expiresAt'];
+        return d.keys().hasAll(required) && d.keys().hasOnly(required);
+      }
+
+      // ─────────────────────────────────────────────────────────────────────
+      // Helper: inviteFieldTypesValid(d)
+      // Field types confirmed from room.js setDoc call.
+      // ─────────────────────────────────────────────────────────────────────
+      function inviteFieldTypesValid(d) {
+        return d.roomId    is string
+            && d.invitedBy is string
+            && d.createdAt is timestamp
+            && d.expiresAt is string;
+      }
+
+      // ─────────────────────────────────────────────────────────────────────
+      // Helper: getRoomData()
+      // Fetches the room document identified by inviteId (== roomId).
+      // Returns the data map. Used in CREATE and DELETE rules to avoid
+      // repeating the path string and to consolidate the get() call.
+      //
+      // Note on billing: each get() call in rules is a billed Firestore read,
+      // even if the rule ultimately denies the request. Using a helper
+      // function reduces code duplication but does not eliminate cost.
+      // Firestore caches identical get() calls within a single rule
+      // evaluation, but cross-rule caching is not guaranteed by documentation.
+      //
+      // let is valid inside function bodies in rules version 2:
+      //   "In rules version v2, functions can define variables using let."
+      // Source: firebase.google.com/docs/rules/rules-language
+      // ─────────────────────────────────────────────────────────────────────
+      function getRoomData() {
+        let roomDoc = get(/databases/$(database)/documents/rooms/$(inviteId));
+        return roomDoc.data;
+      }
+
+      // ─────────────────────────────────────────────────────────────────────
+      // READ
+      //
+      // Only the user whose authenticated email hashes to {emailHash} may
+      // read their invitations.
+      //
+      // hashing.sha256(email).toHexString() is evaluated by Firestore against
+      // the verified JWT — the client cannot supply a forged hash.
+      // A user who knows someone else's email still cannot satisfy this rule
+      // because it hashes the CALLER'S OWN email from the token.
+      // ─────────────────────────────────────────────────────────────────────
+      allow read: if request.auth != null
+                  && hashing.sha256(request.auth.token.email.lower()).toHexString()
+                     == emailHash;
+
+      // ─────────────────────────────────────────────────────────────────────
+      // CREATE
+      //
+      // Enforced conditions:
+      //   1. Caller must be authenticated.
+      //   2. Exact four-field schema — no extra or missing fields.
+      //   3. Field types are valid.
+      //   4. The referenced room (inviteId == roomId) must exist.
+      //      Prevents invitations for non-existent rooms.
+      //   5. The caller must be the room's creator.
+      //      Prevents any authenticated user from sending invitations
+      //      on behalf of someone else or for a room they did not create.
+      //   6. The room must still be "waiting".
+      //      Prevents duplicate invitations once a room is active or ended.
+      //   7. The emailHash in the path must equal SHA-256 of the room's
+      //      stored inviteeEmail.
+      //      Ties the invitation path to the exact email the creator entered.
+      //      A creator cannot redirect an invitation to a different recipient.
+      //   8. The roomId field inside the document must match inviteId.
+      //      Prevents the creator writing an invitation document whose
+      //      roomId field points to a different room.
+      //
+      // getRoomData() is called once; its result is reused across conditions
+      // 5, 6, and 7 within the same rule evaluation.
+      // ─────────────────────────────────────────────────────────────────────
+      allow create: if request.auth != null
+                    && inviteFieldsAreExact(request.resource.data)
+                    && inviteFieldTypesValid(request.resource.data)
+                    && exists(/databases/$(database)/documents/rooms/$(inviteId))
+                    && getRoomData().createdBy == request.auth.uid
+                    && getRoomData().status    == "waiting"
+                    && hashing.sha256(getRoomData().inviteeEmail).toHexString()
+                       == emailHash
+                    && request.resource.data.roomId == inviteId;
+
+      // ─────────────────────────────────────────────────────────────────────
+      // DELETE
+      //
+      // Two permitted principals:
+      //
+      //   Principal A — the invitee (accept or decline):
+      //     Their authenticated email hashes to {emailHash}.
+      //     Covers acceptInvite() step 3 and declineInvite() in room.js.
+      //
+      //   Principal B — the room creator (cancel the room):
+      //     Verified by cross-document read of the room identified by inviteId.
+      //     The exists() check guards against the room having been deleted
+      //     via admin means (rooms are never deleted by the client SDK, but
+      //     defensive programming avoids a rules evaluation error on get() of
+      //     a non-existent document).
+      //     Covers cancelRoom() in room.js.
+      // ─────────────────────────────────────────────────────────────────────
+      allow delete: if request.auth != null
+                    && (
+                      // Principal A: the invitee
+                      hashing.sha256(request.auth.token.email.lower()).toHexString()
+                        == emailHash
+                      ||
+                      // Principal B: the room creator
+                      (exists(/databases/$(database)/documents/rooms/$(inviteId))
+                       && getRoomData().createdBy == request.auth.uid)
+                    );
+
+      // ─────────────────────────────────────────────────────────────────────
+      // UPDATE — never permitted
+      //
+      // Invitations are write-once. No update path exists in room.js.
+      // ─────────────────────────────────────────────────────────────────────
+      allow update: if false;
+    }
+
+  }
+}

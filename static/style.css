@@ -1,0 +1,936 @@
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --clr-bg:          #0f1117;
+  --clr-surface:     #1a1d27;
+  --clr-surface-2:   #22263a;
+  --clr-border:      #2e3250;
+  --clr-accent:      #6c63ff;
+  --clr-accent-glow: rgba(108, 99, 255, 0.25);
+  --clr-green:       #22c55e;
+  --clr-red:         #ef4444;
+  --clr-orange:      #f97316;
+  --clr-text:        #e2e8f0;
+  --clr-muted:       #8892a4;
+  --clr-bubble-bg:   #252a42;
+  --clr-bubble-border: #353b5e;
+  --radius:          14px;
+  --shadow:          0 4px 24px rgba(0,0,0,0.4);
+  --transition:      0.2s ease;
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--clr-bg);
+  color: var(--clr-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.6;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.site-header {
+  background: linear-gradient(135deg, #1a1d27 0%, #12152a 100%);
+  border-bottom: 1px solid var(--clr-border);
+  padding: 1.25rem 2rem;
+}
+
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header-icon {
+  font-size: 2.4rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.site-title {
+  font-size: clamp(1.1rem, 2.2vw, 1.55rem);
+  font-weight: 700;
+  background: linear-gradient(90deg, #a78bfa, #6c63ff, #38bdf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+
+.site-subtitle {
+  font-size: 0.875rem;
+  color: var(--clr-muted);
+  margin-top: 0.15rem;
+}
+
+/* ── Main grid ───────────────────────────────────────────────────────────── */
+/*
+  Desktop: two columns — camera on the left, right-column on the right.
+  The right-column contains two stacked cards (live gesture + chat history).
+  Mobile: single column, stacked.
+*/
+.main-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  padding: 1.75rem 2rem;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  /* Let rows grow so the right column fills the full height */
+  align-items: start;
+}
+
+.right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  /* Match height of camera card so chat history fills available space */
+  height: 100%;
+}
+
+@media (max-width: 800px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
+  .right-column { height: auto; }
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--clr-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ── Video feed ──────────────────────────────────────────────────────────── */
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #0a0c14;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--clr-border);
+}
+
+.video-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 10px;
+}
+
+.camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: #0a0c14;
+  color: var(--clr-muted);
+  text-align: center;
+}
+
+.camera-placeholder.hidden { display: none; }
+
+.placeholder-icon { font-size: 3rem; opacity: 0.4; }
+.placeholder-hint { font-size: 0.8rem; opacity: 0.6; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.controls {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background var(--transition), transform var(--transition),
+              box-shadow var(--transition);
+  letter-spacing: 0.03em;
+}
+
+.btn:active { transform: scale(0.97); }
+
+.btn-start {
+  background: var(--clr-accent);
+  color: #fff;
+}
+.btn-start:hover:not(:disabled) {
+  background: #7c74ff;
+  box-shadow: 0 0 14px var(--clr-accent-glow);
+}
+
+.btn-stop {
+  background: var(--clr-surface-2);
+  color: var(--clr-text);
+  border: 1px solid var(--clr-border);
+}
+.btn-stop:hover:not(:disabled) { background: #2c3050; }
+
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Camera status ───────────────────────────────────────────────────────── */
+.camera-status {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+.status-on  { color: var(--clr-green); }
+.status-off { color: var(--clr-muted); }
+
+/* ── Gesture guide ───────────────────────────────────────────────────────── */
+.gesture-guide {
+  background: var(--clr-surface-2);
+  border: 1px solid var(--clr-border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}
+
+.guide-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--clr-muted);
+  margin-bottom: 0.75rem;
+}
+
+.guide-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--clr-muted);
+}
+
+.guide-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.gesture-chip {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  min-width: 64px;
+  text-align: center;
+  background: var(--clr-accent-glow);
+  color: #a78bfa;
+  border: 1px solid rgba(108, 99, 255, 0.4);
+}
+
+/* ── Live gesture card ───────────────────────────────────────────────────── */
+.live-card {
+  flex-shrink: 0;
+}
+
+.gesture-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--clr-surface-2);
+  border: 1px solid var(--clr-border);
+  border-radius: 10px;
+  min-height: 110px;
+  padding: 1.25rem;
+}
+
+.gesture-label {
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-align: center;
+  transition: color var(--transition);
+}
+
+.state-idle    { color: var(--clr-muted); }
+.state-known   { color: var(--clr-green); }
+.state-unknown { color: var(--clr-orange); }
+.state-none    { color: var(--clr-red); }
+
+@keyframes pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.gesture-label.pop { animation: pop 0.25s ease forwards; }
+
+/* ── History card ────────────────────────────────────────────────────────── */
+.history-card {
+  flex: 1;               /* fill remaining vertical space in right-column */
+  min-height: 0;         /* allow shrinking so card doesn't overflow */
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+/* Clear button — compact, doesn't grow like other .btn elements */
+.btn-clear {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8rem;
+  background: transparent;
+  color: var(--clr-muted);
+  border: 1px solid var(--clr-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition),
+              border-color var(--transition);
+}
+.btn-clear:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--clr-red);
+  border-color: var(--clr-red);
+}
+
+/* ── Chat box ────────────────────────────────────────────────────────────── */
+.chat-box {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.25rem 0.1rem;
+  /* Fixed height on desktop so it scrolls rather than pushing the page */
+  max-height: 340px;
+  min-height: 120px;
+  scroll-behavior: smooth;
+}
+
+/* Webkit scrollbar styling */
+.chat-box::-webkit-scrollbar        { width: 5px; }
+.chat-box::-webkit-scrollbar-track  { background: transparent; }
+.chat-box::-webkit-scrollbar-thumb  { background: var(--clr-border); border-radius: 99px; }
+
+/* ── Chat bubble ─────────────────────────────────────────────────────────── */
+.chat-bubble {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: var(--clr-bubble-bg);
+  border: 1px solid var(--clr-bubble-border);
+  border-radius: 12px 12px 12px 4px;   /* left-aligned speech bubble shape */
+  padding: 0.6rem 0.9rem;
+  max-width: 90%;
+  animation: fadeSlideIn 0.22s ease forwards;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.bubble-text {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--clr-green);
+  letter-spacing: 0.02em;
+}
+
+.bubble-time {
+  font-size: 0.7rem;
+  color: var(--clr-muted);
+  margin-top: 0.15rem;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: var(--clr-muted);
+  text-align: center;
+  padding: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.empty-icon { font-size: 2.2rem; opacity: 0.35; }
+.empty-hint { font-size: 0.78rem; opacity: 0.55; }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.site-footer {
+  border-top: 1px solid var(--clr-border);
+  padding: 1rem 2rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--clr-muted);
+  line-height: 1.8;
+}
+
+.footer-note { opacity: 0.55; font-size: 0.75rem; }
+
+/* ── Voice controls ──────────────────────────────────────────────────────── */
+
+/* Row that holds the toggle + selector side-by-side */
+.voice-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+/* Voice toggle button */
+.btn-voice {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--clr-border);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition),
+              border-color var(--transition), box-shadow var(--transition);
+  letter-spacing: 0.03em;
+}
+
+/* OFF state (default) */
+.btn-voice.voice-off {
+  background: var(--clr-surface-2);
+  color: var(--clr-muted);
+  border-color: var(--clr-border);
+}
+.btn-voice.voice-off:hover {
+  background: #2c3050;
+  color: var(--clr-text);
+}
+
+/* ON state */
+.btn-voice.voice-on {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--clr-green);
+  border-color: rgba(34, 197, 94, 0.45);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.15);
+}
+.btn-voice.voice-on:hover {
+  background: rgba(34, 197, 94, 0.22);
+}
+
+.voice-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Label wrapping the gender select */
+.voice-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--clr-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* Gender drop-down */
+.voice-select {
+  background: var(--clr-surface-2);
+  color: var(--clr-text);
+  border: 1px solid var(--clr-border);
+  border-radius: 6px;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--transition);
+  /* Remove default arrow on some browsers for consistency */
+  appearance: auto;
+}
+.voice-select:focus {
+  border-color: var(--clr-accent);
+}
+
+/* Small informational note below voice controls */
+.voice-note {
+  font-size: 0.75rem;
+  color: var(--clr-muted);
+  min-height: 1em;   /* reserve space so layout doesn't jump */
+  opacity: 0.7;
+}
+
+/* ── Auth bar (header — sign-in email + sign-out button) ─────────────────── */
+
+/* Pushes the auth bar to the far right of the header */
+.header-inner {
+  justify-content: space-between;
+}
+
+.auth-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.auth-email {
+  font-size: 0.8rem;
+  color: var(--clr-muted);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sign-out button — compact, secondary style */
+.btn-signout {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: transparent;
+  color: var(--clr-muted);
+  border: 1px solid var(--clr-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition),
+              border-color var(--transition);
+  letter-spacing: 0.03em;
+}
+
+.btn-signout:hover {
+  background: rgba(239, 68, 68, 0.10);
+  color: var(--clr-red);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* ── Date separator (WhatsApp-style date groups in translation history) ───── */
+
+.date-separator {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.4rem 0 0.2rem;
+  /* Horizontal rule lines either side of the label */
+}
+
+.date-separator::before,
+.date-separator::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--clr-border);
+}
+
+.date-separator-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--clr-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  padding: 0 0.25rem;
+  background: var(--clr-surface);   /* match card background so it "cuts" the line */
+}
+
+/* ── Mode selector tabs ──────────────────────────────────────────────────── */
+
+.mode-tabs {
+  background: var(--clr-surface);
+  border-bottom: 1px solid var(--clr-border);
+}
+
+.mode-tabs-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: flex;
+  gap: 0;
+}
+
+/* Individual tab button */
+.mode-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.75rem 1.4rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: transparent;
+  color: var(--clr-muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: color var(--transition), border-color var(--transition);
+  white-space: nowrap;
+}
+
+.mode-tab:hover {
+  color: var(--clr-text);
+}
+
+/* Active / selected tab */
+.mode-tab--active {
+  color: var(--clr-accent);
+  border-bottom-color: var(--clr-accent);
+}
+
+@media (max-width: 500px) {
+  .mode-tabs-inner { padding: 0 1rem; }
+  .mode-tab        { padding: 0.65rem 0.9rem; font-size: 0.82rem; }
+}
+
+/* ── Panel wrapper ───────────────────────────────────────────────────────── */
+
+/* Fills the remaining vertical space below the tab bar */
+.panel-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Each mode panel fills the wrapper */
+.mode-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * The HTML `hidden` attribute sets display:none in the browser's default
+ * stylesheet, but author CSS rules (like .mode-panel { display: flex })
+ * have higher specificity and override it — so hidden panels remain in
+ * the layout and push visible panels off-screen.
+ *
+ * This rule restores the correct behaviour: any element with the `hidden`
+ * attribute is always removed from layout, regardless of other display rules.
+ * !important is intentional and correct here.
+ */
+[hidden] { display: none !important; }
+
+/* ── Online Communication — coming-soon placeholder ─────────────────────── */
+
+.online-coming-soon {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 2rem;
+  text-align: center;
+  color: var(--clr-muted);
+}
+
+.coming-soon-icon {
+  font-size: 3.5rem;
+  opacity: 0.5;
+  line-height: 1;
+}
+
+.coming-soon-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--clr-text);
+  letter-spacing: -0.02em;
+}
+
+.coming-soon-subtitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--clr-accent);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.coming-soon-hint {
+  font-size: 0.875rem;
+  color: var(--clr-muted);
+  max-width: 420px;
+  line-height: 1.6;
+  opacity: 0.75;
+}
+
+/* ── Online Communication panel ──────────────────────────────────────────── */
+
+/* Each sub-view fills the panel height */
+.online-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem 2rem;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Two-column card layout inside the lobby view */
+.online-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .online-grid  { grid-template-columns: 1fr; }
+  .online-view  { padding: 1rem; }
+}
+
+/* Online-specific card variants */
+.online-card {
+  /* inherits .card base styles */
+}
+
+.online-desc {
+  font-size: 0.875rem;
+  color: var(--clr-muted);
+  line-height: 1.6;
+}
+
+/* Inline form elements reuse auth.css variable names */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--clr-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.form-input {
+  background: var(--clr-surface-2);
+  color: var(--clr-text);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  width: 100%;
+}
+
+.form-input:focus {
+  border-color: var(--clr-accent);
+  box-shadow: 0 0 0 3px var(--clr-accent-glow);
+}
+
+.form-input::placeholder { color: var(--clr-muted); opacity: 0.6; }
+
+/* Inline error / info messages */
+.online-msg {
+  font-size: 0.85rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 7px;
+}
+
+.online-msg--error {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--clr-red);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.online-empty {
+  font-size: 0.875rem;
+  color: var(--clr-muted);
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+/* ── Invitation cards ────────────────────────────────────────────────────── */
+.invite-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.invite-card {
+  background: var(--clr-surface-2);
+  border: 1px solid var(--clr-border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.invite-from {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--clr-text);
+}
+
+.invite-expires {
+  font-size: 0.75rem;
+  color: var(--clr-muted);
+}
+
+.invite-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.3rem;
+}
+
+.invite-btn {
+  flex: 1;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+/* ── Waiting view ────────────────────────────────────────────────────────── */
+.online-waiting-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+.waiting-icon {
+  font-size: 3rem;
+  line-height: 1;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.waiting-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--clr-text);
+}
+
+.waiting-desc {
+  font-size: 0.9rem;
+  color: var(--clr-muted);
+  max-width: 400px;
+}
+
+.waiting-id-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--clr-surface-2);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+.waiting-id-label {
+  color: var(--clr-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.waiting-id-value {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 0.8rem;
+  color: var(--clr-accent);
+  word-break: break-all;
+}
+
+/* ── Active room view ────────────────────────────────────────────────────── */
+.online-room-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 2rem;
+  background: var(--clr-surface);
+  border-bottom: 1px solid var(--clr-border);
+  flex-wrap: wrap;
+}
+
+.room-status-dot {
+  color: var(--clr-green);
+  margin-right: 0.3rem;
+}
+
+.room-status-text {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--clr-green);
+}
+
+.room-id-display {
+  font-size: 0.78rem;
+  color: var(--clr-muted);
+}
+
+.room-id-display code {
+  font-family: "Consolas", monospace;
+  color: var(--clr-accent);
+}
+
+.room-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+  color: var(--clr-muted);
+  padding: 3rem 2rem;
+}
+
+.room-placeholder-icon { font-size: 3rem; opacity: 0.35; }
+.room-placeholder-hint { font-size: 0.8rem; opacity: 0.6; }

@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign-to-Text Communication Assistant</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <header class="site-header">
+    <div class="header-inner">
+      <span class="header-icon" aria-hidden="true">🤟</span>
+      <div>
+        <h1 class="site-title">Sign-to-Text Communication Assistant</h1>
+        <p class="site-subtitle">Show a hand gesture — see the text instantly</p>
+      </div>
+      <!-- Auth bar: shows signed-in email and sign-out button -->
+      <div class="auth-bar" aria-label="Account">
+        <span id="userEmail" class="auth-email" aria-live="polite"></span>
+        <button id="btnSignOut"
+                class="btn btn-signout"
+                onclick="handleSignOut()"
+                title="Sign out">
+          Sign Out
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Mode selector tabs ─────────────────────────────────────────── -->
+  <nav class="mode-tabs" aria-label="Application mode">
+    <div class="mode-tabs-inner">
+      <button id="tab-local"
+              class="mode-tab mode-tab--active"
+              onclick="switchTab('local')"
+              aria-selected="true"
+              role="tab"
+              aria-controls="panel-local">
+        <span aria-hidden="true">📷</span> Local Translation
+      </button>
+      <button id="tab-online"
+              class="mode-tab"
+              onclick="switchTab('online')"
+              aria-selected="false"
+              role="tab"
+              aria-controls="panel-online">
+        <span aria-hidden="true">🌐</span> Online Communication
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── Panel wrapper ──────────────────────────────────────────────── -->
+  <div class="panel-wrapper">
+
+    <!-- ── PANEL: Local Translation ───────────────────────────────── -->
+    <div id="panel-local" class="mode-panel" role="tabpanel" aria-labelledby="tab-local">
+
+      <!-- ── Main content ───────────────────────────────────────────── -->
+      <main class="main-grid">
+
+    <!-- ── LEFT: Camera card ──────────────────────────────────────── -->
+    <section class="card camera-card" aria-label="Camera feed">
+      <h2 class="card-title">
+        <span aria-hidden="true">📷</span> Camera
+      </h2>
+
+      <div class="video-wrapper">
+        <img id="videoFeed"
+             src=""
+             alt="Webcam feed — press Start Camera to begin"
+             class="video-feed"
+        />
+        <div id="cameraPlaceholder" class="camera-placeholder" aria-live="polite">
+          <span class="placeholder-icon" aria-hidden="true">📷</span>
+          <p>Camera is off</p>
+          <p class="placeholder-hint">Press <strong>Start Camera</strong> to begin</p>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls" role="group" aria-label="Camera controls">
+        <button id="btnStart" class="btn btn-start" onclick="startCamera()">
+          ▶ Start Camera
+        </button>
+        <button id="btnStop" class="btn btn-stop" onclick="stopCamera()" disabled>
+          ■ Stop Camera
+        </button>
+      </div>
+
+      <p id="cameraStatus" class="camera-status status-off" aria-live="polite">
+        ● Camera off
+      </p>
+
+      <!-- Gesture reference guide -->
+      <div class="gesture-guide" aria-label="Gesture reference guide">
+        <h3 class="guide-title">Gesture Guide</h3>
+        <ul class="guide-list">
+          <li><span class="gesture-chip">HELLO</span>   Open palm, fingers spread wide</li>
+          <li><span class="gesture-chip">STOP</span>    Open palm, fingers held together</li>
+          <li><span class="gesture-chip">OK</span>      Thumb + index fingertips touching</li>
+          <li><span class="gesture-chip">YES</span>     Thumb pointing straight up</li>
+          <li><span class="gesture-chip">ONE</span>     Only index finger extended</li>
+          <li><span class="gesture-chip">VICTORY</span> Index + middle fingers (V sign)</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ── RIGHT: Live gesture + Chat history ─────────────────────── -->
+    <div class="right-column">
+
+      <!-- Live gesture display -->
+      <section class="card live-card" aria-label="Live gesture">
+        <h2 class="card-title">
+          <span aria-hidden="true">✋</span> Live Gesture
+        </h2>
+        <div class="gesture-display" aria-live="polite" aria-atomic="true">
+          <p id="gestureLabel" class="gesture-label state-idle">Waiting…</p>
+        </div>
+
+        <!-- ── Voice controls ───────────────────────────────────────── -->
+        <div class="voice-controls" role="group" aria-label="Voice controls">
+
+          <!-- Toggle: Voice ON / OFF -->
+          <button id="btnVoice"
+                  class="btn btn-voice voice-off"
+                  onclick="toggleVoice()"
+                  aria-pressed="false"
+                  title="Enable or disable text-to-speech">
+            <span class="voice-icon" aria-hidden="true">🔇</span>
+            <span id="voiceStatusText">Voice Off</span>
+          </button>
+
+          <!-- Voice gender selector -->
+          <label class="voice-label" for="voiceSelect">
+            <span aria-hidden="true">🗣</span>
+            <select id="voiceSelect"
+                    class="voice-select"
+                    onchange="onVoiceSelectChange()"
+                    aria-label="Select voice gender"
+                    title="Choose a voice">
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+            </select>
+          </label>
+
+        </div>
+        <!-- voice status note -->
+        <p id="voiceNote" class="voice-note" aria-live="polite"></p>
+      </section>
+
+      <!-- Translation history (chat panel) -->
+      <section class="card history-card" aria-label="Translation history">
+        <div class="history-header">
+          <h2 class="card-title">
+            <span aria-hidden="true">💬</span> Translation History
+          </h2>
+          <button id="btnClear"
+                  class="btn btn-clear"
+                  onclick="clearHistory()"
+                  title="Clear all history">
+            🗑 Clear
+          </button>
+        </div>
+
+        <!-- Chat message list — scrollable -->
+        <div id="chatBox" class="chat-box" role="log" aria-live="polite" aria-label="Translation messages">
+
+          <!-- Empty state — shown when there are no messages -->
+          <div id="emptyState" class="empty-state">
+            <span class="empty-icon" aria-hidden="true">🤲</span>
+            <p>No translations yet.</p>
+            <p class="empty-hint">Start the camera and show a gesture to begin.</p>
+          </div>
+
+        </div>
+      </section>
+
+    </div><!-- /.right-column -->
+
+  </main>
+
+    </div><!-- /#panel-local -->
+
+    <!-- ── PANEL: Online Communication (placeholder) ──────────────── -->
+    <div id="panel-online" class="mode-panel" role="tabpanel" aria-labelledby="tab-online" hidden>
+
+      <!-- ── Sub-view: Lobby (no active room) ─────────────────────── -->
+      <div id="view-lobby" class="online-view">
+
+        <div class="online-grid">
+
+          <!-- Create a room card -->
+          <section class="card online-card" aria-label="Create a room">
+            <h2 class="card-title"><span aria-hidden="true">➕</span> Start a Session</h2>
+            <p class="online-desc">
+              Enter the email address of the person you want to communicate with.
+              They will receive an invitation and must sign in to join.
+            </p>
+
+            <div class="form-group">
+              <label class="form-label" for="inviteeEmail">Participant email</label>
+              <input id="inviteeEmail"
+                     class="form-input"
+                     type="email"
+                     placeholder="listener@example.com"
+                     autocomplete="off" />
+            </div>
+
+            <p id="createRoomError" class="online-msg online-msg--error" hidden></p>
+
+            <button id="btnCreateRoom" class="btn btn-start" onclick="handleCreateRoom()">
+              Send Invitation
+            </button>
+          </section>
+
+          <!-- Pending invitations card -->
+          <section class="card online-card" aria-label="Pending invitations">
+            <h2 class="card-title"><span aria-hidden="true">📬</span> Invitations</h2>
+
+            <div id="inviteList" class="invite-list">
+              <p class="online-empty">No pending invitations.</p>
+            </div>
+          </section>
+
+        </div><!-- /.online-grid -->
+      </div><!-- /#view-lobby -->
+
+      <!-- ── Sub-view: Waiting for participant to accept ───────────── -->
+      <div id="view-waiting" class="online-view" hidden>
+        <div class="online-waiting-box">
+          <span class="waiting-icon" aria-hidden="true">⏳</span>
+          <h2 class="waiting-title">Waiting for participant…</h2>
+          <p id="waitingDesc" class="waiting-desc"></p>
+          <div class="waiting-id-box">
+            <span class="waiting-id-label">Room ID</span>
+            <code id="waitingRoomId" class="waiting-id-value"></code>
+          </div>
+          <button class="btn btn-stop" onclick="handleCancelRoom()">Cancel</button>
+        </div>
+      </div><!-- /#view-waiting -->
+
+      <!-- ── Sub-view: Room is active ──────────────────────────────── -->
+      <div id="view-room" class="online-view" hidden>
+        <div class="online-room-header">
+          <div>
+            <span class="room-status-dot" aria-hidden="true">●</span>
+            <span id="roomStatusLabel" class="room-status-text">Connected</span>
+          </div>
+          <div class="room-id-display">
+            Room: <code id="activeRoomId"></code>
+          </div>
+          <button class="btn btn-stop" onclick="handleLeaveRoom()">Leave Room</button>
+        </div>
+        <!-- Messaging and video will be added in Phase 2 -->
+        <div class="room-placeholder">
+          <span class="room-placeholder-icon" aria-hidden="true">💬</span>
+          <p>Room is active.</p>
+          <p class="room-placeholder-hint">Messaging and video calling will be added in the next phase.</p>
+        </div>
+      </div><!-- /#view-room -->
+
+    </div><!-- /#panel-online -->
+
+  </div><!-- /.panel-wrapper -->
+
+  <!-- ── Footer ─────────────────────────────────────────────────────── -->
+  <footer class="site-footer">
+    <p>Powered by <strong>MediaPipe</strong> · <strong>OpenCV</strong> · <strong>Flask</strong> · <strong>Firebase</strong></p>
+    <p class="footer-note">Demo project — limited gesture set, not a full sign-language translator.</p>
+  </footer>
+
+  <!-- ── Tab switching (plain JS, no dependencies) ─────────────────── -->
+  <!--
+    switchTab() is defined here rather than in app.js so that:
+    1. It has no dependency on Firebase, Firestore, or any module.
+    2. It works immediately when the DOM loads, before auth resolves.
+    3. app.js, firestore.js, and auth.js are completely unaffected.
+
+    When Local Translation is selected:   panel-local  is shown, panel-online is hidden.
+    When Online Communication is selected: panel-online is shown, panel-local  is hidden.
+
+    The camera, gesture recognition, history, TTS, and Firestore listeners
+    continue running in the background regardless of which tab is visible.
+    Switching tabs never stops or restarts any of that functionality.
+  -->
+  <script>
+    function switchTab(tab) {
+      var panelLocal  = document.getElementById("panel-local");
+      var panelOnline = document.getElementById("panel-online");
+      var tabLocal    = document.getElementById("tab-local");
+      var tabOnline   = document.getElementById("tab-online");
+
+      if (tab === "local") {
+        panelLocal.hidden  = false;
+        panelOnline.hidden = true;
+        tabLocal.classList.add("mode-tab--active");
+        tabLocal.setAttribute("aria-selected", "true");
+        tabOnline.classList.remove("mode-tab--active");
+        tabOnline.setAttribute("aria-selected", "false");
+      } else {
+        panelOnline.hidden = false;
+        panelLocal.hidden  = true;
+        tabOnline.classList.add("mode-tab--active");
+        tabOnline.setAttribute("aria-selected", "true");
+        tabLocal.classList.remove("mode-tab--active");
+        tabLocal.setAttribute("aria-selected", "false");
+      }
+    }
+  </script>
+
+  <script src="/static/app.js"></script>
+
+  <!--
+    Auth guard — type="module" required for ES module imports.
+
+    What this block does:
+      1. Calls guardPage() — redirects unauthenticated users to /login.
+      2. When auth is confirmed:
+         a. Shows the page and displays the signed-in email.
+         b. Sets the SQLite baseline (so existing shared rows are never uploaded).
+         c. Opens the Firestore onSnapshot listener for this user's history.
+         d. Exposes window helpers so app.js can mirror new gestures.
+      3. On page unload, closes the Firestore listener cleanly.
+  -->
+  <script type="module">
+    import { guardPage, signOutUser, showAuthUser } from "/static/auth.js";
+    import { mirrorTranslation,
+             subscribeToHistory,
+             unsubscribeHistory,
+             clearUserHistory }                     from "/static/firestore.js";
+    import { createRoom,
+             listenForInvitations,
+             acceptInvite,
+             declineInvite,
+             listenToRoom,
+             cancelRoom,
+             unsubscribeRoom }                      from "/static/room.js";
+
+    document.body.style.visibility = "hidden";
+
+    // ── Room state (module-level) ─────────────────────────────────────────
+    let _currentUid   = null;
+    let _currentEmail = null;
+    let _pendingRoomId   = null;   // room created but not yet accepted
+    let _pendingInviteeEmail = null;
+
+    // ── Sub-view switching ────────────────────────────────────────────────
+    function showOnlineView(viewId) {
+      ["view-lobby", "view-waiting", "view-room"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.hidden = (id !== viewId);
+      });
+    }
+
+    // ── Create room handler ───────────────────────────────────────────────
+    window.handleCreateRoom = async function() {
+      const input    = document.getElementById("inviteeEmail");
+      const errEl    = document.getElementById("createRoomError");
+      const btn      = document.getElementById("btnCreateRoom");
+      const email    = input ? input.value.trim() : "";
+
+      if (errEl) { errEl.hidden = true; errEl.textContent = ""; }
+      if (!email) {
+        if (errEl) { errEl.textContent = "Please enter an email address."; errEl.hidden = false; }
+        return;
+      }
+
+      if (btn) btn.disabled = true;
+
+      const result = await createRoom(_currentUid, _currentEmail, email);
+
+      if (!result.ok) {
+        if (errEl) { errEl.textContent = result.error; errEl.hidden = false; }
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      // Room created — switch to waiting view
+      _pendingRoomId       = result.roomId;
+      _pendingInviteeEmail = email;
+      if (btn) btn.disabled = false;
+
+      const desc   = document.getElementById("waitingDesc");
+      const idEl   = document.getElementById("waitingRoomId");
+      if (desc)  desc.textContent  = `Invitation sent to ${email}. Waiting for them to accept…`;
+      if (idEl)  idEl.textContent  = result.roomId;
+      showOnlineView("view-waiting");
+
+      // Watch for acceptance
+      listenToRoom(result.roomId, (roomData) => {
+        if (roomData.status === "active") {
+          const activeId = document.getElementById("activeRoomId");
+          if (activeId) activeId.textContent = _pendingRoomId;
+          showOnlineView("view-room");
+        } else if (roomData.status === "ended") {
+          _pendingRoomId = null;
+          showOnlineView("view-lobby");
+        }
+      }, () => {});
+    };
+
+    // ── Cancel room handler ───────────────────────────────────────────────
+    window.handleCancelRoom = async function() {
+      if (!_pendingRoomId) { showOnlineView("view-lobby"); return; }
+      await cancelRoom(_currentUid, _pendingRoomId, _pendingInviteeEmail);
+      _pendingRoomId = null;
+      showOnlineView("view-lobby");
+    };
+
+    // ── Leave room handler ────────────────────────────────────────────────
+    window.handleLeaveRoom = async function() {
+      if (_pendingRoomId) {
+        // Mark room ended so the other participant is also notified
+        try {
+          const { getFirestore, doc, updateDoc, getApps, getApp } =
+            await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+          const { initializeApp } =
+            await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+          const { firebaseConfig } = await import("/static/firebase-config.js");
+          const app  = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+          const db   = getFirestore(app);
+          await updateDoc(doc(db, "rooms", _pendingRoomId), { status: "ended" });
+        } catch (e) { console.warn("[index] leave room update failed", e); }
+      }
+      _pendingRoomId = null;
+      unsubscribeRoom();
+      showOnlineView("view-lobby");
+    };
+
+    // ── Render pending invitations ────────────────────────────────────────
+    function renderInvites(invites) {
+      const listEl = document.getElementById("inviteList");
+      if (!listEl) return;
+      listEl.innerHTML = "";
+
+      if (invites.length === 0) {
+        listEl.innerHTML = '<p class="online-empty">No pending invitations.</p>';
+        return;
+      }
+
+      invites.forEach(invite => {
+        const card = document.createElement("div");
+        card.className = "invite-card";
+
+        const from = document.createElement("p");
+        from.className = "invite-from";
+        from.textContent = `From: ${invite.invitedBy || "unknown"}`;
+
+        const expires = document.createElement("p");
+        expires.className = "invite-expires";
+        if (invite.expiresAt) {
+          try {
+            expires.textContent = `Expires: ${new Date(invite.expiresAt).toLocaleString()}`;
+          } catch { expires.textContent = ""; }
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "invite-actions";
+
+        const acceptBtn = document.createElement("button");
+        acceptBtn.className   = "btn btn-start invite-btn";
+        acceptBtn.textContent = "Accept";
+        acceptBtn.onclick     = async () => {
+          acceptBtn.disabled  = true;
+          const res = await acceptInvite(_currentUid, _currentEmail, invite.roomId);
+          if (res.ok) {
+            _pendingRoomId = invite.roomId;
+            const activeId = document.getElementById("activeRoomId");
+            if (activeId) activeId.textContent = invite.roomId;
+            showOnlineView("view-room");
+
+            // Watch for the room ending
+            listenToRoom(invite.roomId, (roomData) => {
+              if (roomData.status === "ended") {
+                _pendingRoomId = null;
+                unsubscribeRoom();
+                showOnlineView("view-lobby");
+              }
+            }, () => {});
+          } else {
+            alert(res.error || "Could not join room.");
+            acceptBtn.disabled = false;
+          }
+        };
+
+        const declineBtn = document.createElement("button");
+        declineBtn.className   = "btn btn-stop invite-btn";
+        declineBtn.textContent = "Decline";
+        declineBtn.onclick     = async () => {
+          declineBtn.disabled = true;
+          await declineInvite(_currentEmail, invite.roomId);
+        };
+
+        actions.appendChild(acceptBtn);
+        actions.appendChild(declineBtn);
+        card.appendChild(from);
+        card.appendChild(expires);
+        card.appendChild(actions);
+        listEl.appendChild(card);
+      });
+    }
+
+    // ── Auth guard ────────────────────────────────────────────────────────
+    guardPage(async (user) => {
+      document.body.style.visibility = "visible";
+      showAuthUser(document.getElementById("userEmail"));
+
+      _currentUid   = user.uid;
+      _currentEmail = user.email;
+      window.currentUid = user.uid;
+
+      // ── Local Translation: SQLite baseline + Firestore history ──────────
+      await initSqliteBaseline();
+
+      window.firestoreMirror = function(sqliteId, gesture, timestamp, confidence) {
+        mirrorTranslation(user.uid, sqliteId, gesture, timestamp, confidence);
+      };
+      window.firestoreClearHistory = function() {
+        return clearUserHistory(user.uid);
+      };
+
+      subscribeToHistory(
+        user.uid,
+        (rows) => { renderHistory(rows); },
+        (err) => {
+          if (err.code === "permission-denied") {
+            const emptyState = document.getElementById("emptyState");
+            if (emptyState) {
+              emptyState.innerHTML =
+                "<span class='empty-icon'>⚠️</span>" +
+                "<p>Could not load history.</p>" +
+                "<p class='empty-hint'>Check Firestore Security Rules.</p>";
+              emptyState.style.display = "";
+            }
+          }
+        }
+      );
+
+      // ── Online Communication: invitation listener ───────────────────────
+      listenForInvitations(
+        user.email,
+        (invites) => { renderInvites(invites); },
+        () => { /* permission-denied when no invites exist — normal */ }
+      );
+    });
+
+    // ── Cleanup on unload / sign-out ──────────────────────────────────────
+    window.addEventListener("beforeunload", () => {
+      unsubscribeHistory();
+      unsubscribeRoom();
+    });
+
+    window.handleSignOut = async function() {
+      unsubscribeHistory();
+      unsubscribeRoom();
+      await signOutUser();
+    };
+  </script>
+
+</body>
+</html>

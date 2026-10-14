@@ -1,0 +1,212 @@
+/*
+ * auth.css
+ * --------
+ * Styles for the login and register pages.
+ * Imports the same CSS custom properties defined in style.css so both pages
+ * share the same colour palette and typography without duplicating variables.
+ *
+ * These styles are scoped to the auth pages only (login.html, register.html).
+ * The main dashboard (index.html) is not affected.
+ */
+
+/* ── Reset & base (mirrors style.css) ───────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --clr-bg:          #0f1117;
+  --clr-surface:     #1a1d27;
+  --clr-surface-2:   #22263a;
+  --clr-border:      #2e3250;
+  --clr-accent:      #6c63ff;
+  --clr-accent-glow: rgba(108, 99, 255, 0.25);
+  --clr-green:       #22c55e;
+  --clr-red:         #ef4444;
+  --clr-text:        #e2e8f0;
+  --clr-muted:       #8892a4;
+  --radius:          14px;
+  --shadow:          0 4px 24px rgba(0, 0, 0, 0.4);
+  --transition:      0.2s ease;
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--clr-bg);
+  color: var(--clr-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.6;
+  padding: 1.5rem;
+}
+
+/* ── Auth card ───────────────────────────────────────────────────────────── */
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: 2.25rem 2rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+/* ── Brand header inside card ────────────────────────────────────────────── */
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.25rem;
+}
+
+.auth-brand-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.auth-brand-name {
+  font-size: 1rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #a78bfa, #6c63ff, #38bdf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.01em;
+}
+
+/* ── Card heading ────────────────────────────────────────────────────────── */
+.auth-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--clr-text);
+  letter-spacing: -0.02em;
+}
+
+.auth-subtitle {
+  font-size: 0.875rem;
+  color: var(--clr-muted);
+  margin-top: 0.2rem;
+}
+
+/* ── Form ────────────────────────────────────────────────────────────────── */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--clr-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.form-input {
+  background: var(--clr-surface-2);
+  color: var(--clr-text);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  width: 100%;
+}
+
+.form-input:focus {
+  border-color: var(--clr-accent);
+  box-shadow: 0 0 0 3px var(--clr-accent-glow);
+}
+
+.form-input::placeholder {
+  color: var(--clr-muted);
+  opacity: 0.6;
+}
+
+/* ── Submit button ───────────────────────────────────────────────────────── */
+.btn-auth {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--clr-accent);
+  color: #fff;
+  transition: background var(--transition), box-shadow var(--transition),
+              transform var(--transition);
+  letter-spacing: 0.03em;
+  margin-top: 0.25rem;
+}
+
+.btn-auth:hover:not(:disabled) {
+  background: #7c74ff;
+  box-shadow: 0 0 16px var(--clr-accent-glow);
+}
+
+.btn-auth:active { transform: scale(0.98); }
+
+.btn-auth:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Error / info message ────────────────────────────────────────────────── */
+.auth-message {
+  font-size: 0.85rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 7px;
+  text-align: center;
+  display: none;           /* shown by JS when there is a message */
+}
+
+.auth-message.error {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--clr-red);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  display: block;
+}
+
+.auth-message.success {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--clr-green);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  display: block;
+}
+
+/* ── Footer link ─────────────────────────────────────────────────────────── */
+.auth-footer {
+  font-size: 0.85rem;
+  color: var(--clr-muted);
+  text-align: center;
+}
+
+.auth-footer a {
+  color: var(--clr-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
