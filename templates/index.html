@@ -343,8 +343,9 @@
     // ── Room state (module-level) ─────────────────────────────────────────
     let _currentUid   = null;
     let _currentEmail = null;
-    let _pendingRoomId   = null;   // room created but not yet accepted
+    let _pendingRoomId       = null;   // roomId once room is created or joined
     let _pendingInviteeEmail = null;
+    let _activeRoomStatus    = null;   // "waiting" | "active" | "ended" | null
 
     // ── Sub-view switching ────────────────────────────────────────────────
     function showOnlineView(viewId) {
@@ -355,6 +356,37 @@
     }
 
     // ── Create room handler ───────────────────────────────────────────────
+    // ── Room gesture forwarding ────────────────────────────────────────────────
+    // sendGestureToRoom(gesture) writes one message document to the active room.
+    // It is called by window.roomGesture, which app.js invokes from the SQLite
+    // polling loop.  The function is async but fire-and-forget from app.js.
+    async function sendGestureToRoom(gesture) {
+      if (!_pendingRoomId || _activeRoomStatus !== "active") return;
+      try {
+        const { getFirestore, collection, addDoc, serverTimestamp, getApps, getApp } =
+          await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const { initializeApp } =
+          await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+        const { firebaseConfig } = await import("/static/firebase-config.js");
+        const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+        const db  = getFirestore(app);
+        await addDoc(collection(db, "rooms", _pendingRoomId, "messages"), {
+          senderUid:   _currentUid,
+          senderEmail: _currentEmail,
+          text:        gesture,
+          type:        "gesture",
+          timestamp:   serverTimestamp(),
+        });
+      } catch (e) {
+        console.warn("[index] sendGestureToRoom failed:", e.message ?? e);
+      }
+    }
+
+    // Set/clear window.roomGesture so app.js can call it.
+    // app.js guards with typeof === "function", so null is a safe no-op state.
+    function enableRoomGestures()  { window.roomGesture = (g) => sendGestureToRoom(g); }
+    function disableRoomGestures() { window.roomGesture = null; }
+
     window.handleCreateRoom = async function() {
       const input    = document.getElementById("inviteeEmail");
       const errEl    = document.getElementById("createRoomError");
@@ -393,9 +425,13 @@
         if (roomData.status === "active") {
           const activeId = document.getElementById("activeRoomId");
           if (activeId) activeId.textContent = _pendingRoomId;
+          _activeRoomStatus = "active";
+          enableRoomGestures();
           showOnlineView("view-room");
         } else if (roomData.status === "ended") {
           _pendingRoomId = null;
+          _activeRoomStatus = null;
+          disableRoomGestures();
           showOnlineView("view-lobby");
         }
       }, () => {});
@@ -406,6 +442,8 @@
       if (!_pendingRoomId) { showOnlineView("view-lobby"); return; }
       await cancelRoom(_currentUid, _pendingRoomId, _pendingInviteeEmail);
       _pendingRoomId = null;
+      _activeRoomStatus = null;
+      disableRoomGestures();
       showOnlineView("view-lobby");
     };
 
@@ -425,6 +463,8 @@
         } catch (e) { console.warn("[index] leave room update failed", e); }
       }
       _pendingRoomId = null;
+      _activeRoomStatus = null;
+      disableRoomGestures();
       unsubscribeRoom();
       showOnlineView("view-lobby");
     };
@@ -476,12 +516,16 @@
             _pendingRoomId = invite.roomId;
             const activeId = document.getElementById("activeRoomId");
             if (activeId) activeId.textContent = invite.roomId;
+            _activeRoomStatus = "active";
+            enableRoomGestures();
             showOnlineView("view-room");
 
             // Watch for the room ending
             listenToRoom(invite.roomId, (roomData) => {
               if (roomData.status === "ended") {
                 _pendingRoomId = null;
+                _activeRoomStatus = null;
+                disableRoomGestures();
                 unsubscribeRoom();
                 showOnlineView("view-lobby");
               }
@@ -557,11 +601,13 @@
     window.addEventListener("beforeunload", () => {
       unsubscribeHistory();
       unsubscribeRoom();
+      disableRoomGestures();
     });
 
     window.handleSignOut = async function() {
       unsubscribeHistory();
       unsubscribeRoom();
+      disableRoomGestures();
       await signOutUser();
     };
   </script>

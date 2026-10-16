@@ -372,6 +372,18 @@ async function pollSqliteForNewGestures() {
           row.confidence ?? null
         );
       }
+
+      // Forward to the active online room (if any).
+      // window.roomGesture is set by index.html when a room becomes active
+      // and cleared when it ends or the user leaves.  It is null in Local
+      // mode and in all non-active room states, so this call is a no-op
+      // outside of an active room.
+      // Duplicate prevention: this forEach runs exactly once per row because
+      // lastKnownSqliteId advances before this line is reached, so the same
+      // SQLite row can never be processed twice.
+      if (typeof window.roomGesture === "function") {
+        window.roomGesture(row.gesture);
+      }
     });
   } catch { /* silently ignore */ }
 }
