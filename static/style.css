@@ -934,3 +934,111 @@ body {
 
 .room-placeholder-icon { font-size: 3rem; opacity: 0.35; }
 .room-placeholder-hint { font-size: 0.8rem; opacity: 0.6; }
+
+/* ── Room messages display ───────────────────────────────────────────────── */
+.room-messages-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 2rem;
+  background: var(--clr-surface);
+  border-radius: 0 0 var(--radius) var(--radius);
+  min-height: 380px;
+}
+
+.room-messages-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  max-height: 480px;
+  min-height: 200px;
+  padding: 0.5rem 0.25rem;
+  scroll-behavior: smooth;
+}
+
+.room-messages-list::-webkit-scrollbar { width: 5px; }
+.room-messages-list::-webkit-scrollbar-track { background: transparent; }
+.room-messages-list::-webkit-scrollbar-thumb { background: var(--clr-border); border-radius: 99px; }
+
+.room-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-width: 75%;
+  animation: fadeSlideIn 0.22s ease forwards;
+}
+
+.room-msg--mine {
+  align-self: flex-end;
+}
+
+.room-msg--theirs {
+  align-self: flex-start;
+}
+
+.room-msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.room-msg--mine .room-msg-meta {
+  justify-content: flex-end;
+}
+
+.room-msg-sender {
+  font-weight: 600;
+  color: var(--clr-muted);
+}
+
+.room-msg--mine .room-msg-sender {
+  color: var(--clr-accent);
+}
+
+.room-msg-time {
+  font-size: 0.7rem;
+  color: var(--clr-muted);
+  opacity: 0.8;
+}
+
+.room-msg-body {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--clr-bubble-border);
+}
+
+.room-msg--mine .room-msg-body {
+  background: rgba(108, 99, 255, 0.12);
+  border-color: rgba(108, 99, 255, 0.35);
+  border-bottom-right-radius: 3px;
+}
+
+.room-msg--theirs .room-msg-body {
+  background: var(--clr-bubble-bg);
+  border-color: var(--clr-bubble-border);
+  border-bottom-left-radius: 3px;
+}
+
+.room-msg-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--clr-muted);
+}
+
+.room-msg-text {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--clr-green);
+  letter-spacing: 0.02em;
+}

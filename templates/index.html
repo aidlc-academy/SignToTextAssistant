@@ -253,11 +253,10 @@
           </div>
           <button class="btn btn-stop" onclick="handleLeaveRoom()">Leave Room</button>
         </div>
-        <!-- Messaging and video will be added in Phase 2 -->
-        <div class="room-placeholder">
-          <span class="room-placeholder-icon" aria-hidden="true">💬</span>
-          <p>Room is active.</p>
-          <p class="room-placeholder-hint">Messaging and video calling will be added in the next phase.</p>
+        <div class="room-messages-container">
+          <div id="roomMessagesList" class="room-messages-list" role="log" aria-live="polite" aria-label="Room messages">
+            <p class="online-empty">No gesture messages yet. Recognized gestures will appear here in real time.</p>
+          </div>
         </div>
       </div><!-- /#view-room -->
 
@@ -336,6 +335,8 @@
              declineInvite,
              listenToRoom,
              cancelRoom,
+             listenToRoomMessages,
+             unsubscribeRoomMessages,
              unsubscribeRoom }                      from "/static/room.js";
 
     document.body.style.visibility = "hidden";
@@ -353,6 +354,114 @@
         const el = document.getElementById(id);
         if (el) el.hidden = (id !== viewId);
       });
+    }
+
+    // ── Room message formatting & rendering ──────────────────────────────
+    function formatMessageTimestamp(ts) {
+      if (!ts) return "";
+      try {
+        if (typeof ts.toDate === "function") {
+          return ts.toDate().toLocaleTimeString(undefined, {
+            hour: "2-digit", minute: "2-digit", second: "2-digit"
+          });
+        }
+        if (typeof ts.seconds === "number") {
+          return new Date(ts.seconds * 1000).toLocaleTimeString(undefined, {
+            hour: "2-digit", minute: "2-digit", second: "2-digit"
+          });
+        }
+        const d = new Date(ts);
+        if (!isNaN(d)) {
+          return d.toLocaleTimeString(undefined, {
+            hour: "2-digit", minute: "2-digit", second: "2-digit"
+          });
+        }
+      } catch {}
+      return "";
+    }
+
+    function renderRoomMessages(messages) {
+      const listEl = document.getElementById("roomMessagesList");
+      if (!listEl) return;
+      listEl.innerHTML = "";
+
+      if (!messages || messages.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "online-empty";
+        empty.textContent = "No gesture messages yet. Recognized gestures will appear here in real time.";
+        listEl.appendChild(empty);
+        return;
+      }
+
+      messages.forEach((msg) => {
+        const isMine = msg.senderUid === _currentUid;
+        const msgEl = document.createElement("div");
+        msgEl.className = `room-msg ${isMine ? "room-msg--mine" : "room-msg--theirs"}`;
+
+        const metaEl = document.createElement("div");
+        metaEl.className = "room-msg-meta";
+
+        const senderEl = document.createElement("span");
+        senderEl.className = "room-msg-sender";
+        senderEl.textContent = isMine ? "You" : (msg.senderEmail || "Participant");
+
+        const timeEl = document.createElement("span");
+        timeEl.className = "room-msg-time";
+        timeEl.textContent = formatMessageTimestamp(msg.timestamp);
+
+        metaEl.appendChild(senderEl);
+        metaEl.appendChild(timeEl);
+
+        const bodyEl = document.createElement("div");
+        bodyEl.className = "room-msg-body";
+
+        const badgeEl = document.createElement("span");
+        badgeEl.className = "room-msg-badge";
+        badgeEl.textContent = msg.type === "gesture" ? "Gesture" : "Message";
+
+        const textEl = document.createElement("span");
+        textEl.className = "room-msg-text";
+        textEl.textContent = msg.text || "";
+
+        bodyEl.appendChild(badgeEl);
+        bodyEl.appendChild(textEl);
+
+        msgEl.appendChild(metaEl);
+        msgEl.appendChild(bodyEl);
+        listEl.appendChild(msgEl);
+      });
+
+      listEl.scrollTop = listEl.scrollHeight;
+    }
+
+    function clearRoomMessages() {
+      const listEl = document.getElementById("roomMessagesList");
+      if (listEl) {
+        listEl.innerHTML = '<p class="online-empty">No gesture messages yet. Recognized gestures will appear here in real time.</p>';
+      }
+    }
+
+    function activateRoomView(roomId) {
+      _pendingRoomId = roomId;
+      const activeId = document.getElementById("activeRoomId");
+      if (activeId) activeId.textContent = roomId;
+      _activeRoomStatus = "active";
+      enableRoomGestures();
+      showOnlineView("view-room");
+      listenToRoomMessages(roomId, (messages) => {
+        renderRoomMessages(messages);
+      }, (err) => {
+        console.warn("[room] message listener error:", err);
+      });
+    }
+
+    function exitRoomView() {
+      _pendingRoomId = null;
+      _activeRoomStatus = null;
+      disableRoomGestures();
+      unsubscribeRoom();
+      clearRoomMessages();
+      showOnlineView("view-lobby");
     }
 
     // ── Create room handler ───────────────────────────────────────────────
@@ -423,16 +532,11 @@
       // Watch for acceptance
       listenToRoom(result.roomId, (roomData) => {
         if (roomData.status === "active") {
-          const activeId = document.getElementById("activeRoomId");
-          if (activeId) activeId.textContent = _pendingRoomId;
-          _activeRoomStatus = "active";
-          enableRoomGestures();
-          showOnlineView("view-room");
+          if (_activeRoomStatus !== "active") {
+            activateRoomView(result.roomId);
+          }
         } else if (roomData.status === "ended") {
-          _pendingRoomId = null;
-          _activeRoomStatus = null;
-          disableRoomGestures();
-          showOnlineView("view-lobby");
+          exitRoomView();
         }
       }, () => {});
     };
@@ -441,10 +545,7 @@
     window.handleCancelRoom = async function() {
       if (!_pendingRoomId) { showOnlineView("view-lobby"); return; }
       await cancelRoom(_currentUid, _pendingRoomId, _pendingInviteeEmail);
-      _pendingRoomId = null;
-      _activeRoomStatus = null;
-      disableRoomGestures();
-      showOnlineView("view-lobby");
+      exitRoomView();
     };
 
     // ── Leave room handler ────────────────────────────────────────────────
@@ -462,11 +563,7 @@
           await updateDoc(doc(db, "rooms", _pendingRoomId), { status: "ended" });
         } catch (e) { console.warn("[index] leave room update failed", e); }
       }
-      _pendingRoomId = null;
-      _activeRoomStatus = null;
-      disableRoomGestures();
-      unsubscribeRoom();
-      showOnlineView("view-lobby");
+      exitRoomView();
     };
 
     // ── Render pending invitations ────────────────────────────────────────
@@ -513,21 +610,12 @@
           acceptBtn.disabled  = true;
           const res = await acceptInvite(_currentUid, _currentEmail, invite.roomId);
           if (res.ok) {
-            _pendingRoomId = invite.roomId;
-            const activeId = document.getElementById("activeRoomId");
-            if (activeId) activeId.textContent = invite.roomId;
-            _activeRoomStatus = "active";
-            enableRoomGestures();
-            showOnlineView("view-room");
+            activateRoomView(invite.roomId);
 
             // Watch for the room ending
             listenToRoom(invite.roomId, (roomData) => {
               if (roomData.status === "ended") {
-                _pendingRoomId = null;
-                _activeRoomStatus = null;
-                disableRoomGestures();
-                unsubscribeRoom();
-                showOnlineView("view-lobby");
+                exitRoomView();
               }
             }, () => {});
           } else {

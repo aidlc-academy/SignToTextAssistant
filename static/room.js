@@ -51,7 +51,8 @@ import { getFirestore,
          getDocs,
          onSnapshot,
          serverTimestamp,
-         Timestamp }
+         Timestamp,
+         orderBy }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -64,8 +65,9 @@ const db   = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
 
 // ── Active state ──────────────────────────────────────────────────────────
-let _inviteUnsubscribe = null;   // onSnapshot unsub for pending invitations
-let _roomUnsubscribe   = null;   // onSnapshot unsub for current room
+let _inviteUnsubscribe   = null;   // onSnapshot unsub for pending invitations
+let _roomUnsubscribe     = null;   // onSnapshot unsub for current room
+let _messagesUnsubscribe = null;   // onSnapshot unsub for room messages
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -160,7 +162,7 @@ async function createRoom(creatorUid, creatorEmail, inviteeEmail) {
         roomId:      roomId,
         invitedBy:   creatorEmail,          // display name for the invitee UI
         createdAt:   serverTimestamp(),
-        expiresAt:   Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+        expiresAt:   Timestamp.fromDate(new Date(Date.now() + (23 * 60 + 55) * 60 * 1000)),
       });
     } catch (inviteErr) {
       // Invitation write failed — mark the room as ended so it cannot be joined.
@@ -413,6 +415,55 @@ async function cancelRoom(creatorUid, roomId, inviteeEmail) {
 
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Room messages listener
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Listen for messages in an active room.
+ *
+ * Ordered by timestamp ascending (chronological).
+ *
+ * @param {string}   roomId
+ * @param {function} onMessages  Callback(Array<{id, senderUid, senderEmail, text, type, timestamp}>)
+ * @param {function} onError     Callback(Error)
+ */
+function listenToRoomMessages(roomId, onMessages, onError) {
+  if (typeof _messagesUnsubscribe === "function") {
+    _messagesUnsubscribe();
+    _messagesUnsubscribe = null;
+  }
+
+  const messagesRef = collection(db, "rooms", roomId, "messages");
+  const q = query(messagesRef, orderBy("timestamp", "asc"));
+
+  _messagesUnsubscribe = onSnapshot(
+    q,
+    (snap) => {
+      const messages = [];
+      snap.forEach((d) => {
+        messages.push({ id: d.id, ...d.data() });
+      });
+      onMessages(messages);
+    },
+    (err) => {
+      console.error("[room] messages listener error:", err.code, err.message);
+      if (typeof onError === "function") onError(err);
+    }
+  );
+}
+
+/**
+ * Stop listening to room messages.
+ */
+function unsubscribeRoomMessages() {
+  if (typeof _messagesUnsubscribe === "function") {
+    _messagesUnsubscribe();
+    _messagesUnsubscribe = null;
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Cleanup
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -421,8 +472,9 @@ async function cancelRoom(creatorUid, roomId, inviteeEmail) {
  * Call on sign-out or beforeunload.
  */
 function unsubscribeRoom() {
-  if (typeof _inviteUnsubscribe === "function") { _inviteUnsubscribe(); _inviteUnsubscribe = null; }
-  if (typeof _roomUnsubscribe   === "function") { _roomUnsubscribe();   _roomUnsubscribe   = null; }
+  if (typeof _inviteUnsubscribe === "function")   { _inviteUnsubscribe();   _inviteUnsubscribe   = null; }
+  if (typeof _roomUnsubscribe   === "function")   { _roomUnsubscribe();     _roomUnsubscribe     = null; }
+  if (typeof _messagesUnsubscribe === "function") { _messagesUnsubscribe(); _messagesUnsubscribe = null; }
 }
 
 
@@ -437,5 +489,7 @@ export {
   declineInvite,
   listenToRoom,
   cancelRoom,
+  listenToRoomMessages,
+  unsubscribeRoomMessages,
   unsubscribeRoom,
 };
