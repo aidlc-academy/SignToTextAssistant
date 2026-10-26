@@ -20,7 +20,9 @@ import threading
 import time
 
 import cv2
+import joblib
 import mediapipe as mp
+import numpy as np
 from flask import Flask, Response, jsonify, render_template, request
 
 from gesture import classify_gesture
@@ -32,6 +34,38 @@ app = Flask(__name__)
 
 # Initialise the SQLite database (creates the table if it doesn't exist yet)
 init_db()
+
+# ── Custom Machine Learning Gesture Model ────────────────────────────────────
+GESTURE_MODEL_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "gesture_model.pkl"
+)
+gesture_model = None
+_gesture_model_mtime = 0.0
+
+def load_gesture_model(silent=False):
+    """Load or reload gesture_model.pkl safely without crashing the server."""
+    global gesture_model, _gesture_model_mtime
+    try:
+        if os.path.exists(GESTURE_MODEL_PATH):
+            mtime = os.path.getmtime(GESTURE_MODEL_PATH)
+            if gesture_model is None or mtime != _gesture_model_mtime:
+                gesture_model = joblib.load(GESTURE_MODEL_PATH)
+                _gesture_model_mtime = mtime
+                classes = list(getattr(gesture_model, "classes_", []))
+                if not silent:
+                    print(f"[Info] Custom gesture model loaded successfully from {GESTURE_MODEL_PATH}")
+                    print(f"[Info] Available gesture classes: {classes}")
+        else:
+            if gesture_model is None and not silent:
+                print(f"[Warning] Model file not found at {GESTURE_MODEL_PATH}. Falling back to rule-based classifier.")
+    except Exception as exc:
+        if not silent:
+            print(f"[Warning] Failed to load custom gesture model from {GESTURE_MODEL_PATH}: {exc}. Falling back to rule-based classifier.")
+        gesture_model = None
+    return gesture_model
+
+# Load model on Flask startup
+load_gesture_model(silent=False)
 
 # ── MediaPipe setup ──────────────────────────────────────────────────────────
 
@@ -202,7 +236,32 @@ def _capture_loop():
 
             if result.hand_landmarks:
                 _draw_landmarks_on_frame(frame, result.hand_landmarks)
-                raw_label, raw_conf = classify_gesture(result.hand_landmarks[0])
+                hand_landmarks = result.hand_landmarks[0]
+
+                # 2. Extract relative (x, y, z) coordinates for all 21 joints
+                landmarks_flat = []
+                for lm in hand_landmarks:
+                    landmarks_flat.extend([float(lm.x), float(lm.y), float(lm.z)])
+
+                # 3. Classifier Prediction
+                model = load_gesture_model(silent=True)
+                if model is not None and len(landmarks_flat) == 63:
+                    try:
+                        # Reshape 63-element list into 2D array format (1, 63)
+                        input_row = np.array([landmarks_flat])
+                        predicted_label = str(model.predict(input_row)[0])
+                        raw_label = predicted_label
+
+                        if hasattr(model, "predict_proba"):
+                            proba = model.predict_proba(input_row)
+                            raw_conf = float(np.max(proba[0]))
+                        else:
+                            raw_conf = 0.95
+                    except Exception as err:
+                        print(f"[Warning] ML prediction error: {err}")
+                        raw_label, raw_conf = classify_gesture(hand_landmarks)
+                else:
+                    raw_label, raw_conf = classify_gesture(hand_landmarks)
             else:
                 raw_label, raw_conf = "No Hand Detected", 0.0
 

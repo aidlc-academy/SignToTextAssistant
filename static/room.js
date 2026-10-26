@@ -38,21 +38,23 @@
 
 import { initializeApp, getApps, getApp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore,
-         collection,
-         doc,
-         addDoc,
-         getDoc,
-         setDoc,
-         updateDoc,
-         deleteDoc,
-         query,
-         where,
-         getDocs,
-         onSnapshot,
-         serverTimestamp,
-         Timestamp,
-         orderBy }
+import {
+  getFirestore,
+  collection,
+  doc,
+  addDoc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  getDocs,
+  onSnapshot,
+  serverTimestamp,
+  Timestamp,
+  orderBy
+}
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -61,12 +63,12 @@ import { firebaseConfig } from "./firebase-config.js";
 
 // ── Initialise Firebase (shared instance) ─────────────────────────────────
 const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db   = getFirestore(firebaseApp);
+const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
 
 // ── Active state ──────────────────────────────────────────────────────────
-let _inviteUnsubscribe   = null;   // onSnapshot unsub for pending invitations
-let _roomUnsubscribe     = null;   // onSnapshot unsub for current room
+let _inviteUnsubscribe = null;   // onSnapshot unsub for pending invitations
+let _roomUnsubscribe = null;   // onSnapshot unsub for current room
 let _messagesUnsubscribe = null;   // onSnapshot unsub for room messages
 
 
@@ -82,9 +84,9 @@ let _messagesUnsubscribe = null;   // onSnapshot unsub for room messages
  * @returns {Promise<string>}
  */
 async function sha256hex(message) {
-  const msgBuffer  = new TextEncoder().encode(message);
+  const msgBuffer = new TextEncoder().encode(message);
   const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
-  const hashArray  = Array.from(new Uint8Array(hashBuffer));
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
 }
 
@@ -142,11 +144,11 @@ async function createRoom(creatorUid, creatorEmail, inviteeEmail) {
     // 1. Create the room document
     //    participants starts with only the creator — invitee added on accept
     const roomRef = await addDoc(collection(db, "rooms"), {
-      createdBy:    creatorUid,
+      createdBy: creatorUid,
       participants: [creatorUid],
       inviteeEmail: normInvitee,          // stored so creator can see who they invited
-      status:       "waiting",
-      createdAt:    serverTimestamp(),
+      status: "waiting",
+      createdAt: serverTimestamp(),
     });
 
     const roomId = roomRef.id;
@@ -159,10 +161,10 @@ async function createRoom(creatorUid, creatorEmail, inviteeEmail) {
 
     try {
       await setDoc(inviteRef, {
-        roomId:      roomId,
-        invitedBy:   creatorEmail,          // display name for the invitee UI
-        createdAt:   serverTimestamp(),
-        expiresAt:   Timestamp.fromDate(new Date(Date.now() + (23 * 60 + 55) * 60 * 1000)),
+        roomId: roomId,
+        invitedBy: creatorEmail,          // display name for the invitee UI
+        createdAt: serverTimestamp(),
+        expiresAt: Timestamp.fromDate(new Date(Date.now() + (23 * 60 + 55) * 60 * 1000)),
       });
     } catch (inviteErr) {
       // Invitation write failed — mark the room as ended so it cannot be joined.
@@ -213,31 +215,68 @@ async function createRoom(creatorUid, creatorEmail, inviteeEmail) {
  * @param {function} onError     Callback(Error)
  */
 async function listenForInvitations(userEmail, onInvites, onError) {
+  console.log("🚀 [room.js:listenForInvitations] Function called with userEmail:", userEmail);
+  if (!userEmail) {
+    console.warn("⚠️ [room.js:listenForInvitations] Called without userEmail! Aborting.");
+    return;
+  }
+
   // Tear down any previous invite listener
   if (typeof _inviteUnsubscribe === "function") {
+    console.log("🔄 [room.js:listenForInvitations] Tearing down previous invite listener");
     _inviteUnsubscribe();
     _inviteUnsubscribe = null;
   }
 
-  const emailHash = await sha256hex(normaliseEmail(userEmail));
-  const invitesRef = collection(db, "invitations", emailHash, "pendingInvites");
+  try {
+    const normEmail = normaliseEmail(userEmail);
+    console.log("📧 [room.js:listenForInvitations] Normalised email:", normEmail);
+    const emailHash = await sha256hex(normEmail);
+    console.log(`🔑 [room.js:listenForInvitations] Calculated SHA-256 hash: "${emailHash}"`);
+    const invitesRef = collection(db, "invitations", emailHash, "pendingInvites");
+    console.log(`📂 [room.js:listenForInvitations] Attaching onSnapshot to collection path: "${invitesRef.path}"`);
 
-  _inviteUnsubscribe = onSnapshot(
-    invitesRef,
-    (snap) => {
-      const invites = [];
-      snap.forEach(d => invites.push({ id: d.id, ...d.data() }));
-      onInvites(invites);
-    },
-    (err) => {
-      // permission-denied is expected when there are no invitations yet
-      // (the document path doesn't exist so Firestore denies the read)
-      if (err.code !== "permission-denied") {
-        console.error("[room] invite listener error:", err.code, err.message);
+    _inviteUnsubscribe = onSnapshot(
+      invitesRef,
+      (snapshot) => {
+        const docCount = snapshot && snapshot.docs ? snapshot.docs.length : 0;
+        console.log(`⚡ [room.js:onSnapshot] FIRED! Total docs received: ${docCount}, empty: ${snapshot?.empty}, fromCache: ${snapshot?.metadata?.fromCache}`);
+
+        const invites = [];
+        if (snapshot && snapshot.docs) {
+          snapshot.docs.forEach((docSnap, idx) => {
+            const data = docSnap.data() || {};
+            console.log(`📄 [room.js:onSnapshot] Doc [${idx}] ID: "${docSnap.id}" | Raw Data:`, data);
+            invites.push({
+              id: docSnap.id,
+              roomId: data.roomId || docSnap.id,
+              invitedBy: data.invitedBy || "unknown",
+              createdAt: data.createdAt,
+              expiresAt: data.expiresAt,
+              ...data,
+            });
+          });
+        }
+
+        console.log(`📦 [room.js:onSnapshot] Passing ${invites.length} mapped invite(s) to onInvites callback:`, invites);
+        if (typeof onInvites === "function") {
+          onInvites(invites);
+        } else {
+          console.error("❌ [room.js:onSnapshot] onInvites is not a function!", onInvites);
+        }
+      },
+      (err) => {
+        console.error("❌ [room.js:onSnapshot ERROR] Failed to listen to invitations:", err.code, err.message, err);
+        if (typeof onError === "function") {
+          onError(err);
+        }
       }
-      if (typeof onError === "function") onError(err);
-    }
-  );
+    );
+    console.log("✅ [room.js:listenForInvitations] onSnapshot listener attached successfully.");
+  } catch (err) {
+    console.error("💥 [room.js:listenForInvitations] Synchronous/setup error:", err.message, err);
+    if (typeof onError === "function") onError(err);
+  }
 }
 
 
@@ -262,7 +301,7 @@ async function listenForInvitations(userEmail, onInvites, onError) {
 async function acceptInvite(userUid, userEmail, roomId) {
   try {
     // 1. Read the room
-    const roomRef  = doc(db, "rooms", roomId);
+    const roomRef = doc(db, "rooms", roomId);
     const roomSnap = await getDoc(roomRef);
 
     if (!roomSnap.exists()) {
@@ -286,7 +325,7 @@ async function acceptInvite(userUid, userEmail, roomId) {
     // 2. Add self to participants and activate the room
     await updateDoc(roomRef, {
       participants: [...roomData.participants, userUid],
-      status:       "active",
+      status: "active",
     });
 
     // 3. Delete the invitation
@@ -415,20 +454,167 @@ async function cancelRoom(creatorUid, roomId, inviteeEmail) {
 
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Room messages listener
+// Room messages: sending and listening
 // ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Send a message (text or gesture) to an active room.
+ *
+ * @param {string} roomId
+ * @param {string} senderUid
+ * @param {string} senderEmail
+ * @param {string} text
+ * @param {"text"|"gesture"} type
+ * @returns {Promise<{ok: boolean, id?: string, error?: string, code?: string}>}
+ */
+async function sendRoomMessage(roomId, senderUid, senderEmail, text, type = "text") {
+  console.log(`📤 [room.js:sendRoomMessage] Sending ${type} message to room ${roomId}:`, { senderUid, senderEmail, text });
+  if (!roomId) {
+    console.warn("⚠️ [room.js:sendRoomMessage] Missing roomId!");
+    return { ok: false, error: "No active room." };
+  }
+  const cleanText = (text || "").trim();
+  if (!cleanText) {
+    console.warn("⚠️ [room.js:sendRoomMessage] Empty message text!");
+    return { ok: false, error: "Message cannot be empty." };
+  }
+
+  const uid = senderUid || auth.currentUser?.uid;
+  const email = senderEmail || auth.currentUser?.email || "Participant";
+
+  if (!uid) {
+    console.error("❌ [room.js:sendRoomMessage] No authenticated user UID found!");
+    return { ok: false, error: "User is not authenticated." };
+  }
+
+  try {
+    const messagesRef = collection(db, "rooms", roomId, "messages");
+    const docRef = await addDoc(messagesRef, {
+      senderUid: uid,
+      senderEmail: email,
+      text: cleanText,
+      type: type,
+      timestamp: serverTimestamp(),
+    });
+    console.log(`✅ [room.js:sendRoomMessage] Message written to Firestore! Doc ID: ${docRef.id}`);
+    return { ok: true, id: docRef.id };
+  } catch (err) {
+    console.error(`❌ [room.js:sendRoomMessage ERROR]:`, err.code, err.message, err);
+    return { ok: false, error: err.message, code: err.code };
+  }
+}
+
+/**
+ * Text-to-Speech helper for room messages using the native Web Speech API.
+ * Speaks the text aloud via window.speechSynthesis.speak().
+ *
+ * @param {string} text - Message or gesture text to speak aloud
+ */
+function speakRoomMessage(text) {
+  if (!text || typeof window === "undefined" || !("speechSynthesis" in window)) {
+    return;
+  }
+
+  // ── Mute check: verify if room voice is enabled ─────────────────────────
+  if (typeof window.isRoomVoiceEnabled === "function") {
+    if (!window.isRoomVoiceEnabled()) {
+      console.log(`🔇 [room.js:speakRoomMessage] Room voice is muted (Voice Off). Suppressed: "${text}"`);
+      return;
+    }
+  } else {
+    const btn = document.getElementById("btnRoomVoice");
+    if (btn && btn.classList.contains("voice-off")) {
+      console.log(`🔇 [room.js:speakRoomMessage] Room voice is muted (voice-off). Suppressed: "${text}"`);
+      return;
+    }
+  }
+
+  try {
+    // If window.speak is available from app.js, delegate with force=true to inherit voice preferences
+    if (typeof window.speak === "function") {
+      window.speak(text, true);
+      console.log(`🗣️ [room.js:speakRoomMessage] Spoke via window.speak: "${text}"`);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(String(text).trim());
+    utterance.lang = "en-US";
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    // Pick voice according to gender selection in DOM
+    const roomSelect = document.getElementById("roomVoiceSelect");
+    const gender = (roomSelect && roomSelect.value) || "female";
+    const femaleKeywords = ["female","woman","girl","zira","samantha","victoria","karen","moira","tessa","fiona","allison","ava","susan"];
+    const maleKeywords   = ["male","man","david","mark","james","daniel","alex","fred","thomas","jorge","rishi"];
+    const keywords = gender === "female" ? femaleKeywords : maleKeywords;
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length > 0) {
+      let match = voices.find((v) => v.lang && v.lang.startsWith("en") && keywords.some((k) => v.name.toLowerCase().includes(k)));
+      if (!match) match = voices.find((v) => v.lang && v.lang.startsWith("en"));
+      if (match) utterance.voice = match;
+    }
+
+    window.speechSynthesis.speak(utterance);
+    console.log(`🗣️ [room.js:speakRoomMessage] Spoke: "${text}"`);
+  } catch (err) {
+    console.warn("⚠️ [room.js:speakRoomMessage] Web Speech API error:", err);
+  }
+}
+
+// Fallback handlers if app.js is not yet evaluated
+function toggleRoomVoice() {
+  if (typeof window.toggleRoomVoice === "function" && window.toggleRoomVoice !== toggleRoomVoice) {
+    return window.toggleRoomVoice();
+  }
+  const btn = document.getElementById("btnRoomVoice");
+  const status = document.getElementById("roomVoiceStatusText");
+  const isCurrentlyOn = btn ? btn.classList.contains("voice-on") : true;
+  const nextOn = !isCurrentlyOn;
+  if (btn) {
+    btn.classList.toggle("voice-on", nextOn);
+    btn.classList.toggle("voice-off", !nextOn);
+    btn.setAttribute("aria-pressed", String(nextOn));
+    const icon = btn.querySelector(".voice-icon");
+    if (icon) icon.textContent = nextOn ? "🔊" : "🔇";
+    if (status) status.textContent = nextOn ? "Voice On" : "Voice Off";
+  }
+  if (!nextOn && "speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+function onRoomVoiceSelectChange() {
+  if (typeof window.onRoomVoiceSelectChange === "function" && window.onRoomVoiceSelectChange !== onRoomVoiceSelectChange) {
+    return window.onRoomVoiceSelectChange();
+  }
+}
+
+// Expose globally for convenience
+if (typeof window !== "undefined") {
+  window.speakRoomMessage = speakRoomMessage;
+  if (!window.toggleRoomVoice) window.toggleRoomVoice = toggleRoomVoice;
+  if (!window.onRoomVoiceSelectChange) window.onRoomVoiceSelectChange = onRoomVoiceSelectChange;
+}
 
 /**
  * Listen for messages in an active room.
  *
  * Ordered by timestamp ascending (chronological).
+ * State management ensures newly arriving messages are distinguished from
+ * initial history so that speech synthesis is only triggered on new messages.
  *
  * @param {string}   roomId
- * @param {function} onMessages  Callback(Array<{id, senderUid, senderEmail, text, type, timestamp}>)
+ * @param {function} onMessages  Callback(messages: Array, newMessages: Array)
  * @param {function} onError     Callback(Error)
  */
 function listenToRoomMessages(roomId, onMessages, onError) {
+  console.log(`👂 [room.js:listenToRoomMessages] Setting up listener for room: ${roomId}`);
   if (typeof _messagesUnsubscribe === "function") {
+    console.log("🔄 [room.js:listenToRoomMessages] Tearing down previous messages listener");
     _messagesUnsubscribe();
     _messagesUnsubscribe = null;
   }
@@ -436,17 +622,55 @@ function listenToRoomMessages(roomId, onMessages, onError) {
   const messagesRef = collection(db, "rooms", roomId, "messages");
   const q = query(messagesRef, orderBy("timestamp", "asc"));
 
+  let isInitialSnapshot = true;
+  const seenMessageIds = new Set();
+  const listenerStartTime = Date.now();
+
   _messagesUnsubscribe = onSnapshot(
     q,
     (snap) => {
+      console.log(`⚡ [room.js:listenToRoomMessages] onSnapshot fired! Total docs: ${snap.size}, fromCache: ${snap.metadata.fromCache}`);
       const messages = [];
+      const newMessages = [];
+
       snap.forEach((d) => {
-        messages.push({ id: d.id, ...d.data() });
+        const data = d.data();
+        const msg = { id: d.id, ...data };
+        messages.push(msg);
+
+        // State check: distinguish newly arriving messages from initial load
+        if (!isInitialSnapshot && !seenMessageIds.has(d.id)) {
+          let msgMillis = 0;
+          if (data.timestamp) {
+            if (typeof data.timestamp.toMillis === "function") {
+              msgMillis = data.timestamp.toMillis();
+            } else if (typeof data.timestamp.seconds === "number") {
+              msgMillis = data.timestamp.seconds * 1000;
+            } else if (typeof data.timestamp === "number") {
+              msgMillis = data.timestamp;
+            }
+          }
+          // Accept if pending write or timestamp is >= listenerStartTime (with small skew margin)
+          if (!msgMillis || msgMillis >= listenerStartTime - 5000) {
+            newMessages.push(msg);
+          }
+        }
+        seenMessageIds.add(d.id);
       });
-      onMessages(messages);
+
+      if (isInitialSnapshot) {
+        isInitialSnapshot = false;
+        console.log(`📋 [room.js:listenToRoomMessages] Initial snapshot loaded with ${messages.length} existing message(s). TTS suppressed for history.`);
+      } else if (newMessages.length > 0) {
+        console.log(`🔊 [room.js:listenToRoomMessages] Detected ${newMessages.length} newly arriving message(s):`, newMessages);
+      }
+
+      if (typeof onMessages === "function") {
+        onMessages(messages, newMessages);
+      }
     },
     (err) => {
-      console.error("[room] messages listener error:", err.code, err.message);
+      console.error("❌ [room.js:listenToRoomMessages ERROR]:", err.code, err.message, err);
       if (typeof onError === "function") onError(err);
     }
   );
@@ -468,13 +692,22 @@ function unsubscribeRoomMessages() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Tear down all active listeners.
+ * Tear down room session listeners (room status & messages) without
+ * cancelling the invitation listener.
+ * Call when leaving or cancelling a room.
+ */
+function unsubscribeRoomSession() {
+  if (typeof _roomUnsubscribe === "function") { _roomUnsubscribe(); _roomUnsubscribe = null; }
+  if (typeof _messagesUnsubscribe === "function") { _messagesUnsubscribe(); _messagesUnsubscribe = null; }
+}
+
+/**
+ * Tear down all active listeners including invitations.
  * Call on sign-out or beforeunload.
  */
 function unsubscribeRoom() {
-  if (typeof _inviteUnsubscribe === "function")   { _inviteUnsubscribe();   _inviteUnsubscribe   = null; }
-  if (typeof _roomUnsubscribe   === "function")   { _roomUnsubscribe();     _roomUnsubscribe     = null; }
-  if (typeof _messagesUnsubscribe === "function") { _messagesUnsubscribe(); _messagesUnsubscribe = null; }
+  unsubscribeRoomSession();
+  if (typeof _inviteUnsubscribe === "function") { _inviteUnsubscribe(); _inviteUnsubscribe = null; }
 }
 
 
@@ -489,7 +722,12 @@ export {
   declineInvite,
   listenToRoom,
   cancelRoom,
+  sendRoomMessage,
   listenToRoomMessages,
   unsubscribeRoomMessages,
+  unsubscribeRoomSession,
   unsubscribeRoom,
+  speakRoomMessage,
+  toggleRoomVoice,
+  onRoomVoiceSelectChange,
 };

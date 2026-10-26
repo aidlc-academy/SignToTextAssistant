@@ -6,3 +6,8 @@ flask>=3.1.0           # Web framework that serves the browser UI and video stre
 
 # Optional: text-to-speech feature
 pyttsx3>=2.90          # Converts recognised gesture text to spoken audio (works offline)
+
+# Machine Learning & Gesture Training
+pandas>=2.2.0
+scikit-learn>=1.4.0
+joblib>=1.3.0

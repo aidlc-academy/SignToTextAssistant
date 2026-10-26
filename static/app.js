@@ -46,6 +46,9 @@ const btnVoice          = document.getElementById("btnVoice");
 const voiceStatusText   = document.getElementById("voiceStatusText");
 const voiceSelect       = document.getElementById("voiceSelect");
 const voiceNote         = document.getElementById("voiceNote");
+const btnRoomVoice        = document.getElementById("btnRoomVoice");
+const roomVoiceStatusText = document.getElementById("roomVoiceStatusText");
+const roomVoiceSelect     = document.getElementById("roomVoiceSelect");
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 2. Application state
@@ -60,9 +63,10 @@ let lastKnownSqliteId = 0;     // highest SQLite row id already mirrored to Fire
 // 3. Text-to-Speech  (Web Speech API — runs entirely in the browser)
 // ═══════════════════════════════════════════════════════════════════════════
 
-let voiceEnabled  = false;
-let selectedVoice = null;
-let allVoices     = [];
+let voiceEnabled     = false;
+let roomVoiceEnabled = true;  // Online room incoming speech starts enabled by default
+let selectedVoice    = null;
+let allVoices        = [];
 
 function loadVoices() {
   const voices = window.speechSynthesis.getVoices();
@@ -87,7 +91,15 @@ function pickVoice() {
     setVoiceNote("No voices found — speech unavailable.");
     return;
   }
-  const gender = voiceSelect.value;
+
+  // Synchronize dropdown values between Local Translation and Active Room
+  const rSelect = document.getElementById("roomVoiceSelect") || roomVoiceSelect;
+  const lSelect = document.getElementById("voiceSelect") || voiceSelect;
+  const gender = (rSelect && rSelect.value) || (lSelect && lSelect.value) || "female";
+
+  if (lSelect && lSelect.value !== gender) lSelect.value = gender;
+  if (rSelect && rSelect.value !== gender) rSelect.value = gender;
+
   const femaleKeywords = ["female","woman","girl","zira","samantha","victoria",
                           "karen","moira","tessa","fiona","allison","ava","susan"];
   const maleKeywords   = ["male","man","david","mark","james","daniel",
@@ -101,20 +113,75 @@ function pickVoice() {
   if (!match) match = allVoices[0];
   selectedVoice = match;
   setVoiceNote(`Voice: ${match.name} (${match.lang})`);
+  console.log(`🔊 [app.js:pickVoice] Selected voice (${gender}): ${match ? match.name : "none"}`);
 }
 
-function setVoiceNote(text) { voiceNote.textContent = text; }
+function setVoiceNote(text) {
+  if (voiceNote) voiceNote.textContent = text;
+}
 
-function speak(text) {
-  if (!voiceEnabled || !("speechSynthesis" in window) || !selectedVoice) return;
+function speak(text, force = false) {
+  if (!force && !voiceEnabled) return;
+  if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
-  const u    = new SpeechSynthesisUtterance(text);
-  u.voice    = selectedVoice;
+  const u = new SpeechSynthesisUtterance(String(text).trim());
+  if (selectedVoice) {
+    u.voice = selectedVoice;
+  } else {
+    const voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length > 0) {
+      const match = voices.find(v => v.lang && v.lang.startsWith("en"));
+      if (match) u.voice = match;
+    }
+  }
   u.lang     = "en-US";
   u.rate     = 0.95;
   u.pitch    = 1.0;
   u.volume   = 1.0;
   window.speechSynthesis.speak(u);
+}
+
+// ── Room Voice Controls & State Sync ─────────────────────────────────────────
+
+function updateRoomVoiceUI() {
+  const btn = document.getElementById("btnRoomVoice") || btnRoomVoice;
+  const status = document.getElementById("roomVoiceStatusText") || roomVoiceStatusText;
+  if (!btn) return;
+  if (roomVoiceEnabled) {
+    btn.classList.replace("voice-off", "voice-on");
+    btn.setAttribute("aria-pressed", "true");
+    const icon = btn.querySelector(".voice-icon");
+    if (icon) icon.textContent = "🔊";
+    if (status) status.textContent = "Voice On";
+  } else {
+    btn.classList.replace("voice-on", "voice-off");
+    btn.setAttribute("aria-pressed", "false");
+    const icon = btn.querySelector(".voice-icon");
+    if (icon) icon.textContent = "🔇";
+    if (status) status.textContent = "Voice Off";
+  }
+}
+
+function toggleRoomVoice() {
+  roomVoiceEnabled = !roomVoiceEnabled;
+  updateRoomVoiceUI();
+  console.log(`🔊 [app.js:toggleRoomVoice] Room voice is now: ${roomVoiceEnabled ? "ON" : "OFF"}`);
+  if (roomVoiceEnabled) {
+    loadVoices();
+  } else {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+}
+
+function onRoomVoiceSelectChange() {
+  const rSelect = document.getElementById("roomVoiceSelect") || roomVoiceSelect;
+  const lSelect = document.getElementById("voiceSelect") || voiceSelect;
+  if (rSelect && lSelect) {
+    lSelect.value = rSelect.value;
+  }
+  pickVoice();
 }
 
 function toggleVoice() {
@@ -135,7 +202,28 @@ function toggleVoice() {
   }
 }
 
-function onVoiceSelectChange() { pickVoice(); }
+function onVoiceSelectChange() {
+  const rSelect = document.getElementById("roomVoiceSelect") || roomVoiceSelect;
+  const lSelect = document.getElementById("voiceSelect") || voiceSelect;
+  if (lSelect && rSelect) {
+    rSelect.value = lSelect.value;
+  }
+  pickVoice();
+}
+
+// Expose speech and room voice utilities globally
+window.speak = speak;
+window.getSelectedVoice = () => selectedVoice;
+window.isRoomVoiceEnabled = () => roomVoiceEnabled;
+window.setRoomVoiceEnabled = (val) => {
+  roomVoiceEnabled = Boolean(val);
+  updateRoomVoiceUI();
+};
+window.toggleVoice = toggleVoice;
+window.onVoiceSelectChange = onVoiceSelectChange;
+window.toggleRoomVoice = toggleRoomVoice;
+window.onRoomVoiceSelectChange = onRoomVoiceSelectChange;
+window.updateRoomVoiceUI = updateRoomVoiceUI;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 4. Live gesture label
@@ -143,17 +231,29 @@ function onVoiceSelectChange() { pickVoice(); }
 
 function updateGestureLabel(label) {
   let stateClass;
-  if (label === "No Hand Detected")                         stateClass = "state-none";
-  else if (label === "Unknown Gesture" || label === "Waiting…") stateClass = "state-unknown";
-  else                                                      stateClass = "state-known";
+  if (label === "No Hand Detected")                                   stateClass = "state-none";
+  else if (label === "Unknown Gesture")                              stateClass = "state-unknown";
+  else if (label === "Waiting…" || label === "Error starting camera") stateClass = "state-idle";
+  else                                                                stateClass = "state-known";
 
-  if (gestureLabel.textContent === label) return;
-  gestureLabel.textContent = label;
-  gestureLabel.classList.remove("state-idle","state-known","state-unknown","state-none");
-  gestureLabel.classList.add(stateClass);
-  gestureLabel.classList.remove("pop");
-  void gestureLabel.offsetWidth;
-  gestureLabel.classList.add("pop");
+  if (gestureLabel && gestureLabel.textContent !== label) {
+    gestureLabel.textContent = label;
+    gestureLabel.classList.remove("state-idle","state-known","state-unknown","state-none");
+    gestureLabel.classList.add(stateClass);
+    gestureLabel.classList.remove("pop");
+    void gestureLabel.offsetWidth;
+    gestureLabel.classList.add("pop");
+  }
+
+  const roomGestureLabel = document.getElementById("roomGestureLabel");
+  if (roomGestureLabel && roomGestureLabel.textContent !== label) {
+    roomGestureLabel.textContent = label;
+    roomGestureLabel.classList.remove("state-idle","state-known","state-unknown","state-none");
+    roomGestureLabel.classList.add(stateClass);
+    roomGestureLabel.classList.remove("pop");
+    void roomGestureLabel.offsetWidth;
+    roomGestureLabel.classList.add("pop");
+  }
 }
 
 async function pollGesture() {
@@ -407,67 +507,212 @@ async function initSqliteBaseline() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 7. Camera controls
+// 7. Camera controls & Active Room stream integration
 // ═══════════════════════════════════════════════════════════════════════════
+
+function setCameraButtonsState(starting) {
+  const startBtns = [
+    document.getElementById("btnStart"),
+    document.getElementById("btnRoomStart"),
+    document.getElementById("roomBtnStart")
+  ].filter(Boolean);
+
+  const stopBtns = [
+    document.getElementById("btnStop"),
+    document.getElementById("btnRoomStop"),
+    document.getElementById("roomBtnStop")
+  ].filter(Boolean);
+
+  startBtns.forEach(btn => { btn.disabled = starting; });
+  stopBtns.forEach(btn => { btn.disabled = !starting; });
+}
+
+function syncCameraUI(active) {
+  setCameraButtonsState(active);
+
+  const placeholders = [
+    document.getElementById("cameraPlaceholder"),
+    document.getElementById("roomCameraPlaceholder")
+  ].filter(Boolean);
+
+  placeholders.forEach(p => {
+    if (active) p.classList.add("hidden");
+    else p.classList.remove("hidden");
+  });
+
+  const statuses = [
+    document.getElementById("cameraStatus"),
+    document.getElementById("roomCameraStatus")
+  ].filter(Boolean);
+
+  statuses.forEach(s => {
+    s.textContent = active ? "● Camera on" : "● Camera off";
+    s.className = active ? "camera-status status-on" : "camera-status status-off";
+  });
+}
+
+let roomCanvasAnimId = null;
+
+function startRoomCanvasLoop() {
+  if (roomCanvasAnimId) {
+    cancelAnimationFrame(roomCanvasAnimId);
+    roomCanvasAnimId = null;
+  }
+
+  const canvas = document.getElementById("roomCanvas");
+  const video = document.getElementById("roomVideo");
+  const roomFeed = document.getElementById("roomVideoFeed");
+  const localFeed = document.getElementById("videoFeed");
+
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  // Attempt to link canvas stream to <video id="roomVideo">
+  function connectStreamToVideo() {
+    if (video && !video.srcObject && typeof canvas.captureStream === "function") {
+      try {
+        const stream = canvas.captureStream(30);
+        video.srcObject = stream;
+        video.play().catch(() => {});
+      } catch (e) {
+        console.warn("[app] roomVideo captureStream:", e);
+      }
+    }
+  }
+
+  function draw() {
+    if (!isRunning) return;
+
+    const source = (roomFeed && roomFeed.naturalWidth > 0)
+      ? roomFeed
+      : (localFeed && localFeed.naturalWidth > 0 ? localFeed : null);
+
+    if (source && source.naturalWidth > 0) {
+      if (canvas.width !== source.naturalWidth || canvas.height !== source.naturalHeight) {
+        canvas.width = source.naturalWidth;
+        canvas.height = source.naturalHeight;
+      }
+      ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+      connectStreamToVideo();
+    }
+
+    roomCanvasAnimId = requestAnimationFrame(draw);
+  }
+
+  roomCanvasAnimId = requestAnimationFrame(draw);
+}
+
+function stopRoomCanvasLoop() {
+  if (roomCanvasAnimId) {
+    cancelAnimationFrame(roomCanvasAnimId);
+    roomCanvasAnimId = null;
+  }
+  const canvas = document.getElementById("roomCanvas");
+  if (canvas) {
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  const video = document.getElementById("roomVideo");
+  if (video && video.srcObject) {
+    try {
+      video.srcObject.getTracks().forEach(t => t.stop());
+    } catch (e) {}
+    video.srcObject = null;
+  }
+}
 
 async function startCamera() {
   if (isRunning) return;
-  btnStart.disabled = true;
+  setCameraButtonsState(true);
 
   try {
     const res = await fetch("/start", { method: "POST" });
     if (!res.ok) throw new Error("Server error starting camera");
 
-    isRunning     = true;
-    videoFeed.src = "/video_feed";
-    cameraPlaceholder.classList.add("hidden");
+    isRunning = true;
+    window.isRunning = true;
 
-    btnStop.disabled         = false;
-    cameraStatus.textContent = "● Camera on";
-    cameraStatus.className   = "camera-status status-on";
+    const localFeed = document.getElementById("videoFeed");
+    if (localFeed) localFeed.src = "/video_feed";
+
+    const roomFeed = document.getElementById("roomVideoFeed");
+    if (roomFeed) roomFeed.src = "/video_feed";
+
+    startRoomCanvasLoop();
+    syncCameraUI(true);
 
     updateGestureLabel("No Hand Detected");
 
     // Poll live gesture label every 300 ms
     gesturePollId = setInterval(pollGesture, 300);
 
-    // Poll SQLite for new gestures every 1 s (for TTS + Firestore mirroring)
-    // Note: this does NOT render rows to the chat panel.
+    // Poll SQLite for new gestures every 1 s (for TTS + Firestore mirroring + room forwarding)
     sqlitePollId = setInterval(pollSqliteForNewGestures, 1000);
 
   } catch (err) {
     console.error("Could not start camera:", err);
-    btnStart.disabled = false;
+    syncCameraUI(false);
     updateGestureLabel("Error starting camera");
   }
 }
 
 async function stopCamera() {
   if (!isRunning) return;
-  btnStop.disabled = true;
+  const stopBtns = [
+    document.getElementById("btnStop"),
+    document.getElementById("btnRoomStop"),
+    document.getElementById("roomBtnStop")
+  ].filter(Boolean);
+  stopBtns.forEach(btn => { btn.disabled = true; });
 
   try {
     await fetch("/stop", { method: "POST" });
   } catch { /* best-effort */ }
 
-  isRunning     = false;
-  videoFeed.src = "";
-  cameraPlaceholder.classList.remove("hidden");
+  isRunning = false;
+  window.isRunning = false;
+
+  const localFeed = document.getElementById("videoFeed");
+  if (localFeed) localFeed.src = "";
+
+  const roomFeed = document.getElementById("roomVideoFeed");
+  if (roomFeed) roomFeed.src = "";
+
+  stopRoomCanvasLoop();
+  syncCameraUI(false);
 
   clearInterval(gesturePollId);
   clearInterval(sqlitePollId);
   gesturePollId = null;
   sqlitePollId  = null;
 
-  btnStart.disabled        = false;
-  cameraStatus.textContent = "● Camera off";
-  cameraStatus.className   = "camera-status status-off";
-
-  gestureLabel.textContent = "Waiting…";
-  gestureLabel.classList.remove("state-known","state-unknown","state-none","pop");
-  gestureLabel.classList.add("state-idle");
+  updateGestureLabel("Waiting…");
 
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+}
+
+function bindCameraControls() {
+  const startBtns = [
+    document.getElementById("btnStart"),
+    document.getElementById("btnRoomStart"),
+    document.getElementById("roomBtnStart")
+  ].filter(Boolean);
+
+  const stopBtns = [
+    document.getElementById("btnStop"),
+    document.getElementById("btnRoomStop"),
+    document.getElementById("roomBtnStop")
+  ].filter(Boolean);
+
+  startBtns.forEach(btn => {
+    btn.removeEventListener("click", startCamera);
+    btn.addEventListener("click", startCamera);
+  });
+
+  stopBtns.forEach(btn => {
+    btn.removeEventListener("click", stopCamera);
+    btn.addEventListener("click", stopCamera);
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -476,11 +721,30 @@ async function stopCamera() {
 
 if ("speechSynthesis" in window) {
   loadVoices();
+  updateRoomVoiceUI();
 } else {
   setVoiceNote("Text-to-speech is not supported in this browser.");
-  btnVoice.disabled    = true;
-  voiceSelect.disabled = true;
+  if (btnVoice) btnVoice.disabled = true;
+  if (voiceSelect) voiceSelect.disabled = true;
+  const btnR = document.getElementById("btnRoomVoice");
+  const selR = document.getElementById("roomVoiceSelect");
+  if (btnR) btnR.disabled = true;
+  if (selR) selR.disabled = true;
 }
+
+bindCameraControls();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bindCameraControls);
+}
+
+// Global exposures
+window.startCamera = startCamera;
+window.stopCamera = stopCamera;
+window.syncCameraUI = syncCameraUI;
+window.startRoomCanvasLoop = startRoomCanvasLoop;
+window.stopRoomCanvasLoop = stopRoomCanvasLoop;
+window.bindCameraControls = bindCameraControls;
+window.isRunning = isRunning;
 
 // History is now loaded by the Firestore onSnapshot listener which is
 // started by index.html after auth is confirmed.

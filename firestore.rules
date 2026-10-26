@@ -278,15 +278,12 @@ service cloud.firestore {
         // ─────────────────────────────────────────────────────────────────
         // Helper: isRoomParticipant()
         // Reads the parent room document to check whether the caller is
-        // one of its participants. Cannot reuse isParticipant() from the
-        // parent match block because resource.data in a sub-collection
-        // refers to the message document, not the room document.
+        // one of its participants.
         // ─────────────────────────────────────────────────────────────────
         function isRoomParticipant() {
-          let roomDoc = get(/databases/$(database)/documents/rooms/$(roomId));
           return request.auth != null
-              && roomDoc != null
-              && request.auth.uid in roomDoc.data.participants;
+              && exists(/databases/$(database)/documents/rooms/$(roomId))
+              && request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.participants;
         }
 
         // ─────────────────────────────────────────────────────────────────
@@ -315,9 +312,9 @@ service cloud.firestore {
         // ─────────────────────────────────────────────────────────────────
         // READ
         //
-        // Only authenticated room participants may read messages.
+        // Only authenticated room participants may get or list messages.
         // ─────────────────────────────────────────────────────────────────
-        allow read: if isRoomParticipant();
+        allow get, list: if isRoomParticipant();
 
         // ─────────────────────────────────────────────────────────────────
         // CREATE
@@ -426,10 +423,14 @@ service cloud.firestore {
       // request.time < resource.data.expiresAt enforces the 24-hour expiry:
       // both values are Firestore Timestamps, so < is a valid comparison.
       // ─────────────────────────────────────────────────────────────────────
-      allow read: if request.auth != null
+      allow get: if request.auth != null
                   && hashing.sha256(request.auth.token.email.lower()).toHexString()
                      == emailHash
                   && request.time < resource.data.expiresAt;
+
+      allow list: if request.auth != null
+                  && hashing.sha256(request.auth.token.email.lower()).toHexString()
+                     == emailHash;
 
       // ─────────────────────────────────────────────────────────────────────
       // CREATE

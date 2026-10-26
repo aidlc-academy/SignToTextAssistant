@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sign-to-Text Communication Assistant</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v=20261025_split" />
 </head>
+
 <body>
 
   <!-- ── Header ─────────────────────────────────────────────────────── -->
@@ -19,10 +21,7 @@
       <!-- Auth bar: shows signed-in email and sign-out button -->
       <div class="auth-bar" aria-label="Account">
         <span id="userEmail" class="auth-email" aria-live="polite"></span>
-        <button id="btnSignOut"
-                class="btn btn-signout"
-                onclick="handleSignOut()"
-                title="Sign out">
+        <button id="btnSignOut" class="btn btn-signout" onclick="handleSignOut()" title="Sign out">
           Sign Out
         </button>
       </div>
@@ -32,20 +31,12 @@
   <!-- ── Mode selector tabs ─────────────────────────────────────────── -->
   <nav class="mode-tabs" aria-label="Application mode">
     <div class="mode-tabs-inner">
-      <button id="tab-local"
-              class="mode-tab mode-tab--active"
-              onclick="switchTab('local')"
-              aria-selected="true"
-              role="tab"
-              aria-controls="panel-local">
+      <button id="tab-local" class="mode-tab mode-tab--active" onclick="switchTab('local')" aria-selected="true"
+        role="tab" aria-controls="panel-local">
         <span aria-hidden="true">📷</span> Local Translation
       </button>
-      <button id="tab-online"
-              class="mode-tab"
-              onclick="switchTab('online')"
-              aria-selected="false"
-              role="tab"
-              aria-controls="panel-online">
+      <button id="tab-online" class="mode-tab" onclick="switchTab('online')" aria-selected="false" role="tab"
+        aria-controls="panel-online">
         <span aria-hidden="true">🌐</span> Online Communication
       </button>
     </div>
@@ -60,126 +51,113 @@
       <!-- ── Main content ───────────────────────────────────────────── -->
       <main class="main-grid">
 
-    <!-- ── LEFT: Camera card ──────────────────────────────────────── -->
-    <section class="card camera-card" aria-label="Camera feed">
-      <h2 class="card-title">
-        <span aria-hidden="true">📷</span> Camera
-      </h2>
-
-      <div class="video-wrapper">
-        <img id="videoFeed"
-             src=""
-             alt="Webcam feed — press Start Camera to begin"
-             class="video-feed"
-        />
-        <div id="cameraPlaceholder" class="camera-placeholder" aria-live="polite">
-          <span class="placeholder-icon" aria-hidden="true">📷</span>
-          <p>Camera is off</p>
-          <p class="placeholder-hint">Press <strong>Start Camera</strong> to begin</p>
-        </div>
-      </div>
-
-      <!-- Controls -->
-      <div class="controls" role="group" aria-label="Camera controls">
-        <button id="btnStart" class="btn btn-start" onclick="startCamera()">
-          ▶ Start Camera
-        </button>
-        <button id="btnStop" class="btn btn-stop" onclick="stopCamera()" disabled>
-          ■ Stop Camera
-        </button>
-      </div>
-
-      <p id="cameraStatus" class="camera-status status-off" aria-live="polite">
-        ● Camera off
-      </p>
-
-      <!-- Gesture reference guide -->
-      <div class="gesture-guide" aria-label="Gesture reference guide">
-        <h3 class="guide-title">Gesture Guide</h3>
-        <ul class="guide-list">
-          <li><span class="gesture-chip">HELLO</span>   Open palm, fingers spread wide</li>
-          <li><span class="gesture-chip">STOP</span>    Open palm, fingers held together</li>
-          <li><span class="gesture-chip">OK</span>      Thumb + index fingertips touching</li>
-          <li><span class="gesture-chip">YES</span>     Thumb pointing straight up</li>
-          <li><span class="gesture-chip">ONE</span>     Only index finger extended</li>
-          <li><span class="gesture-chip">VICTORY</span> Index + middle fingers (V sign)</li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- ── RIGHT: Live gesture + Chat history ─────────────────────── -->
-    <div class="right-column">
-
-      <!-- Live gesture display -->
-      <section class="card live-card" aria-label="Live gesture">
-        <h2 class="card-title">
-          <span aria-hidden="true">✋</span> Live Gesture
-        </h2>
-        <div class="gesture-display" aria-live="polite" aria-atomic="true">
-          <p id="gestureLabel" class="gesture-label state-idle">Waiting…</p>
-        </div>
-
-        <!-- ── Voice controls ───────────────────────────────────────── -->
-        <div class="voice-controls" role="group" aria-label="Voice controls">
-
-          <!-- Toggle: Voice ON / OFF -->
-          <button id="btnVoice"
-                  class="btn btn-voice voice-off"
-                  onclick="toggleVoice()"
-                  aria-pressed="false"
-                  title="Enable or disable text-to-speech">
-            <span class="voice-icon" aria-hidden="true">🔇</span>
-            <span id="voiceStatusText">Voice Off</span>
-          </button>
-
-          <!-- Voice gender selector -->
-          <label class="voice-label" for="voiceSelect">
-            <span aria-hidden="true">🗣</span>
-            <select id="voiceSelect"
-                    class="voice-select"
-                    onchange="onVoiceSelectChange()"
-                    aria-label="Select voice gender"
-                    title="Choose a voice">
-              <option value="female">Female</option>
-              <option value="male">Male</option>
-            </select>
-          </label>
-
-        </div>
-        <!-- voice status note -->
-        <p id="voiceNote" class="voice-note" aria-live="polite"></p>
-      </section>
-
-      <!-- Translation history (chat panel) -->
-      <section class="card history-card" aria-label="Translation history">
-        <div class="history-header">
+        <!-- ── LEFT: Camera card ──────────────────────────────────────── -->
+        <section class="card camera-card" aria-label="Camera feed">
           <h2 class="card-title">
-            <span aria-hidden="true">💬</span> Translation History
+            <span aria-hidden="true">📷</span> Camera
           </h2>
-          <button id="btnClear"
-                  class="btn btn-clear"
-                  onclick="clearHistory()"
-                  title="Clear all history">
-            🗑 Clear
-          </button>
-        </div>
 
-        <!-- Chat message list — scrollable -->
-        <div id="chatBox" class="chat-box" role="log" aria-live="polite" aria-label="Translation messages">
-
-          <!-- Empty state — shown when there are no messages -->
-          <div id="emptyState" class="empty-state">
-            <span class="empty-icon" aria-hidden="true">🤲</span>
-            <p>No translations yet.</p>
-            <p class="empty-hint">Start the camera and show a gesture to begin.</p>
+          <div class="video-wrapper">
+            <img id="videoFeed" src="" alt="Webcam feed — press Start Camera to begin" class="video-feed" />
+            <div id="cameraPlaceholder" class="camera-placeholder" aria-live="polite">
+              <span class="placeholder-icon" aria-hidden="true">📷</span>
+              <p>Camera is off</p>
+              <p class="placeholder-hint">Press <strong>Start Camera</strong> to begin</p>
+            </div>
           </div>
 
-        </div>
-      </section>
+          <!-- Controls -->
+          <div class="controls" role="group" aria-label="Camera controls">
+            <button id="btnStart" class="btn btn-start" onclick="startCamera()">
+              ▶ Start Camera
+            </button>
+            <button id="btnStop" class="btn btn-stop" onclick="stopCamera()" disabled>
+              ■ Stop Camera
+            </button>
+          </div>
 
-    </div><!-- /.right-column -->
+          <p id="cameraStatus" class="camera-status status-off" aria-live="polite">
+            ● Camera off
+          </p>
 
-  </main>
+          <!-- Gesture reference guide -->
+          <div class="gesture-guide" aria-label="Gesture reference guide">
+            <h3 class="guide-title">Gesture Guide</h3>
+            <ul class="guide-list">
+              <li><span class="gesture-chip">HELLO</span> Open palm, fingers spread wide</li>
+              <li><span class="gesture-chip">STOP</span> Open palm, fingers held together</li>
+              <li><span class="gesture-chip">OK</span> Thumb + index fingertips touching</li>
+              <li><span class="gesture-chip">YES</span> Thumb pointing straight up</li>
+              <li><span class="gesture-chip">ONE</span> Only index finger extended</li>
+              <li><span class="gesture-chip">VICTORY</span> Index + middle fingers (V sign)</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- ── RIGHT: Live gesture + Chat history ─────────────────────── -->
+        <div class="right-column">
+
+          <!-- Live gesture display -->
+          <section class="card live-card" aria-label="Live gesture">
+            <h2 class="card-title">
+              <span aria-hidden="true">✋</span> Live Gesture
+            </h2>
+            <div class="gesture-display" aria-live="polite" aria-atomic="true">
+              <p id="gestureLabel" class="gesture-label state-idle">Waiting…</p>
+            </div>
+
+            <!-- ── Voice controls ───────────────────────────────────────── -->
+            <div class="voice-controls" role="group" aria-label="Voice controls">
+
+              <!-- Toggle: Voice ON / OFF -->
+              <button id="btnVoice" class="btn btn-voice voice-off" onclick="toggleVoice()" aria-pressed="false"
+                title="Enable or disable text-to-speech">
+                <span class="voice-icon" aria-hidden="true">🔇</span>
+                <span id="voiceStatusText">Voice Off</span>
+              </button>
+
+              <!-- Voice gender selector -->
+              <label class="voice-label" for="voiceSelect">
+                <span aria-hidden="true">🗣</span>
+                <select id="voiceSelect" class="voice-select" onchange="onVoiceSelectChange()"
+                  aria-label="Select voice gender" title="Choose a voice">
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                </select>
+              </label>
+
+            </div>
+            <!-- voice status note -->
+            <p id="voiceNote" class="voice-note" aria-live="polite"></p>
+          </section>
+
+          <!-- Translation history (chat panel) -->
+          <section class="card history-card" aria-label="Translation history">
+            <div class="history-header">
+              <h2 class="card-title">
+                <span aria-hidden="true">💬</span> Translation History
+              </h2>
+              <button id="btnClear" class="btn btn-clear" onclick="clearHistory()" title="Clear all history">
+                🗑 Clear
+              </button>
+            </div>
+
+            <!-- Chat message list — scrollable -->
+            <div id="chatBox" class="chat-box" role="log" aria-live="polite" aria-label="Translation messages">
+
+              <!-- Empty state — shown when there are no messages -->
+              <div id="emptyState" class="empty-state">
+                <span class="empty-icon" aria-hidden="true">🤲</span>
+                <p>No translations yet.</p>
+                <p class="empty-hint">Start the camera and show a gesture to begin.</p>
+              </div>
+
+            </div>
+          </section>
+
+        </div><!-- /.right-column -->
+
+      </main>
 
     </div><!-- /#panel-local -->
 
@@ -201,11 +179,8 @@
 
             <div class="form-group">
               <label class="form-label" for="inviteeEmail">Participant email</label>
-              <input id="inviteeEmail"
-                     class="form-input"
-                     type="email"
-                     placeholder="listener@example.com"
-                     autocomplete="off" />
+              <input id="inviteeEmail" class="form-input" type="email" placeholder="listener@example.com"
+                autocomplete="off" />
             </div>
 
             <p id="createRoomError" class="online-msg online-msg--error" hidden></p>
@@ -253,11 +228,99 @@
           </div>
           <button class="btn btn-stop" onclick="handleLeaveRoom()">Leave Room</button>
         </div>
-        <div class="room-messages-container">
-          <div id="roomMessagesList" class="room-messages-list" role="log" aria-live="polite" aria-label="Room messages">
-            <p class="online-empty">No gesture messages yet. Recognized gestures will appear here in real time.</p>
-          </div>
-        </div>
+
+        <div id="activeRoom" class="room-split-layout">
+          <!-- ── Left Column: Camera Panel ───────────────────────────── -->
+          <section class="card room-camera-card" aria-label="Sign language camera feed">
+            <h2 class="card-title">
+              <span aria-hidden="true">📷</span> Camera Feed
+            </h2>
+
+            <div class="video-wrapper room-video-wrapper">
+              <!-- Video element for MediaPipe stream -->
+              <video id="roomVideo" class="video-feed room-video" playsinline muted autoplay></video>
+              <!-- Canvas element for MediaPipe stream -->
+              <canvas id="roomCanvas" class="room-canvas"></canvas>
+              <!-- Hidden MJPEG source to feed canvas/video in background -->
+              <img id="roomVideoFeed" src="" alt="Webcam feed" class="video-feed room-video-img" style="display: none;" />
+              <!-- Placeholder when camera is off -->
+              <div id="roomCameraPlaceholder" class="camera-placeholder" aria-live="polite">
+                <span class="placeholder-icon" aria-hidden="true">📷</span>
+                <p>Camera is off</p>
+                <p class="placeholder-hint">Press <strong>Start Camera</strong> to begin signing</p>
+              </div>
+            </div>
+
+            <!-- Dedicated Active Room Camera Controls -->
+            <div class="controls" role="group" aria-label="Active room camera controls">
+              <button id="btnRoomStart" class="btn btn-start" onclick="startCamera()">
+                ▶ Start Camera
+              </button>
+              <button id="btnRoomStop" class="btn btn-stop" onclick="stopCamera()" disabled>
+                ■ Stop Camera
+              </button>
+            </div>
+
+            <div class="room-camera-footer">
+              <p id="roomCameraStatus" class="camera-status status-off" aria-live="polite">
+                ● Camera off
+              </p>
+              <div class="room-gesture-pill-box">
+                <span class="room-gesture-caption">Live Gesture:</span>
+                <span id="roomGestureLabel" class="gesture-label-sm state-idle">Waiting…</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- ── Right Column: Chat Interface ────────────────────────── -->
+          <section class="card room-chat-card" aria-label="Room chat messages">
+            <div class="room-chat-header">
+              <h2 class="card-title">
+                <span aria-hidden="true">💬</span> Live Room Chat
+              </h2>
+
+              <!-- Room voice controls -->
+              <div class="voice-controls room-voice-controls" role="group" aria-label="Room voice controls">
+                <!-- Toggle: Voice ON / OFF -->
+                <button id="btnRoomVoice" class="btn btn-voice voice-on" onclick="toggleRoomVoice()" aria-pressed="true"
+                  title="Enable or disable text-to-speech for room messages">
+                  <span class="voice-icon" aria-hidden="true">🔊</span>
+                  <span id="roomVoiceStatusText">Voice On</span>
+                </button>
+
+                <!-- Voice gender selector -->
+                <label class="voice-label" for="roomVoiceSelect">
+                  <span aria-hidden="true">🗣</span>
+                  <select id="roomVoiceSelect" class="voice-select" onchange="onRoomVoiceSelectChange()"
+                    aria-label="Select room voice gender" title="Choose a voice for room messages">
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div class="room-messages-container">
+              <div id="roomMessagesList" class="room-messages-list" role="log" aria-live="polite"
+                aria-label="Room messages">
+                <p class="online-empty">No gesture messages yet. Recognized gestures will appear here in real time.</p>
+              </div>
+              <form id="roomChatForm" class="room-chat-form" onsubmit="handleSendRoomMessage(event)">
+                <input
+                  type="text"
+                  id="roomChatInput"
+                  class="room-chat-input"
+                  placeholder="Type a reply to the room…"
+                  maxlength="500"
+                  autocomplete="off"
+                  required
+                />
+                <button type="submit" id="btnSendRoomMessage" class="btn btn-start room-chat-btn">Send</button>
+              </form>
+            </div>
+          </section>
+        </div><!-- /#activeRoom -->
+
       </div><!-- /#view-room -->
 
     </div><!-- /#panel-online -->
@@ -266,7 +329,8 @@
 
   <!-- ── Footer ─────────────────────────────────────────────────────── -->
   <footer class="site-footer">
-    <p>Powered by <strong>MediaPipe</strong> · <strong>OpenCV</strong> · <strong>Flask</strong> · <strong>Firebase</strong></p>
+    <p>Powered by <strong>MediaPipe</strong> · <strong>OpenCV</strong> · <strong>Flask</strong> ·
+      <strong>Firebase</strong></p>
     <p class="footer-note">Demo project — limited gesture set, not a full sign-language translator.</p>
   </footer>
 
@@ -286,13 +350,13 @@
   -->
   <script>
     function switchTab(tab) {
-      var panelLocal  = document.getElementById("panel-local");
+      var panelLocal = document.getElementById("panel-local");
       var panelOnline = document.getElementById("panel-online");
-      var tabLocal    = document.getElementById("tab-local");
-      var tabOnline   = document.getElementById("tab-online");
+      var tabLocal = document.getElementById("tab-local");
+      var tabOnline = document.getElementById("tab-online");
 
       if (tab === "local") {
-        panelLocal.hidden  = false;
+        panelLocal.hidden = false;
         panelOnline.hidden = true;
         tabLocal.classList.add("mode-tab--active");
         tabLocal.setAttribute("aria-selected", "true");
@@ -300,7 +364,7 @@
         tabOnline.setAttribute("aria-selected", "false");
       } else {
         panelOnline.hidden = false;
-        panelLocal.hidden  = true;
+        panelLocal.hidden = true;
         tabOnline.classList.add("mode-tab--active");
         tabOnline.setAttribute("aria-selected", "true");
         tabLocal.classList.remove("mode-tab--active");
@@ -309,7 +373,7 @@
     }
   </script>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20261026_roomvoice"></script>
 
   <!--
     Auth guard — type="module" required for ES module imports.
@@ -324,36 +388,50 @@
       3. On page unload, closes the Firestore listener cleanly.
   -->
   <script type="module">
-    import { guardPage, signOutUser, showAuthUser } from "/static/auth.js";
-    import { mirrorTranslation,
-             subscribeToHistory,
-             unsubscribeHistory,
-             clearUserHistory }                     from "/static/firestore.js";
-    import { createRoom,
-             listenForInvitations,
-             acceptInvite,
-             declineInvite,
-             listenToRoom,
-             cancelRoom,
-             listenToRoomMessages,
-             unsubscribeRoomMessages,
-             unsubscribeRoom }                      from "/static/room.js";
+    import { guardPage, signOutUser, showAuthUser } from "/static/auth.js?v=20261024_sync";
+    import {
+      mirrorTranslation,
+      subscribeToHistory,
+      unsubscribeHistory,
+      clearUserHistory
+    } from "/static/firestore.js?v=20261024_sync";
+    import {
+      createRoom,
+      listenForInvitations,
+      acceptInvite,
+      declineInvite,
+      listenToRoom,
+      cancelRoom,
+      sendRoomMessage,
+      listenToRoomMessages,
+      unsubscribeRoomMessages,
+      unsubscribeRoomSession,
+      unsubscribeRoom,
+      speakRoomMessage,
+      toggleRoomVoice,
+      onRoomVoiceSelectChange
+    } from "/static/room.js?v=20261026_roomvoice";
 
     document.body.style.visibility = "hidden";
 
     // ── Room state (module-level) ─────────────────────────────────────────
-    let _currentUid   = null;
+    let _currentUid = null;
     let _currentEmail = null;
-    let _pendingRoomId       = null;   // roomId once room is created or joined
+    let _pendingRoomId = null;   // roomId once room is created or joined
     let _pendingInviteeEmail = null;
-    let _activeRoomStatus    = null;   // "waiting" | "active" | "ended" | null
+    let _activeRoomStatus = null;   // "waiting" | "active" | "ended" | null
 
     // ── Sub-view switching ────────────────────────────────────────────────
     function showOnlineView(viewId) {
+      const isRoom = (viewId === "view-room" || viewId === "activeRoom");
       ["view-lobby", "view-waiting", "view-room"].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.hidden = (id !== viewId);
+        if (el) el.hidden = (isRoom ? id !== "view-room" : id !== viewId);
       });
+      const activeRoom = document.getElementById("activeRoom");
+      if (activeRoom && isRoom) {
+        activeRoom.hidden = false;
+      }
     }
 
     // ── Room message formatting & rendering ──────────────────────────────
@@ -376,16 +454,21 @@
             hour: "2-digit", minute: "2-digit", second: "2-digit"
           });
         }
-      } catch {}
+      } catch { }
       return "";
     }
 
-    function renderRoomMessages(messages) {
+    function renderRoomMessages(messages, newMessages = []) {
+      console.log("🎨 [index.html:renderRoomMessages] Called with messages payload:", messages);
       const listEl = document.getElementById("roomMessagesList");
-      if (!listEl) return;
+      if (!listEl) {
+        console.error("❌ [index.html:renderRoomMessages] #roomMessagesList NOT found in DOM!");
+        return;
+      }
       listEl.innerHTML = "";
 
       if (!messages || messages.length === 0) {
+        console.log("ℹ️ [index.html:renderRoomMessages] 0 messages. Showing empty placeholder.");
         const empty = document.createElement("p");
         empty.className = "online-empty";
         empty.textContent = "No gesture messages yet. Recognized gestures will appear here in real time.";
@@ -393,10 +476,11 @@
         return;
       }
 
-      messages.forEach((msg) => {
-        const isMine = msg.senderUid === _currentUid;
+      console.log(`📊 [index.html:renderRoomMessages] Rendering ${messages.length} message(s) to DOM`);
+      messages.forEach((msg, idx) => {
+        const isMine = msg.senderUid === _currentUid || msg.senderUid === window.currentUid;
         const msgEl = document.createElement("div");
-        msgEl.className = `room-msg ${isMine ? "room-msg--mine" : "room-msg--theirs"}`;
+        msgEl.className = `room-msg ${isMine ? "room-msg--mine" : "room-msg--theirs"} ${msg.type === "text" ? "room-msg--text" : "room-msg--gesture"}`;
 
         const metaEl = document.createElement("div");
         metaEl.className = "room-msg-meta";
@@ -432,6 +516,16 @@
       });
 
       listEl.scrollTop = listEl.scrollHeight;
+      console.log(`✅ [index.html:renderRoomMessages] Rendered ${messages.length} message(s) into DOM.`);
+
+      // Trigger Text-to-Speech whenever a new message (gesture or text) is appended
+      if (Array.isArray(newMessages) && newMessages.length > 0) {
+        newMessages.forEach((msg) => {
+          if (msg && msg.text && typeof speakRoomMessage === "function") {
+            speakRoomMessage(msg.text);
+          }
+        });
+      }
     }
 
     function clearRoomMessages() {
@@ -442,16 +536,38 @@
     }
 
     function activateRoomView(roomId) {
+      console.log("🎉 [index.html:activateRoomView] Activating room view for roomId:", roomId);
       _pendingRoomId = roomId;
       const activeId = document.getElementById("activeRoomId");
       if (activeId) activeId.textContent = roomId;
       _activeRoomStatus = "active";
       enableRoomGestures();
       showOnlineView("view-room");
-      listenToRoomMessages(roomId, (messages) => {
-        renderRoomMessages(messages);
+
+      if (window.isRunning && typeof window.startRoomCanvasLoop === "function") {
+        window.startRoomCanvasLoop();
+      }
+      if (typeof window.syncCameraUI === "function") {
+        window.syncCameraUI(Boolean(window.isRunning));
+      }
+      if (typeof window.updateRoomVoiceUI === "function") {
+        window.updateRoomVoiceUI();
+      }
+
+      listenToRoomMessages(roomId, (messages, newMessages) => {
+        renderRoomMessages(messages, newMessages);
       }, (err) => {
-        console.warn("[room] message listener error:", err);
+        console.error("❌ [index.html:activateRoomView] Messages listener error:", err.code, err.message, err);
+        const listEl = document.getElementById("roomMessagesList");
+        if (listEl) {
+          const isPerm = err.code === "permission-denied";
+          listEl.innerHTML = `
+            <div class="online-empty" style="color: #ff6b6b; padding: 1rem; text-align: left;">
+              <p><strong>Error loading room messages:</strong> ${escapeHtml(err.code || err.message)}</p>
+              ${isPerm ? '<p style="font-size: 0.85em; margin-top: 4px; color: #ff9999;">Firestore permission denied on rooms/' + escapeHtml(roomId) + '/messages. Please verify that firestore.rules grants read/list access to room participants.</p>' : ''}
+            </div>
+          `;
+        }
       });
     }
 
@@ -459,8 +575,16 @@
       _pendingRoomId = null;
       _activeRoomStatus = null;
       disableRoomGestures();
-      unsubscribeRoom();
+      unsubscribeRoomSession();
       clearRoomMessages();
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      const chatInput = document.getElementById("roomChatInput");
+      if (chatInput) chatInput.value = "";
+      if (typeof window.stopRoomCanvasLoop === "function") {
+        window.stopRoomCanvasLoop();
+      }
       showOnlineView("view-lobby");
     }
 
@@ -470,37 +594,32 @@
     // It is called by window.roomGesture, which app.js invokes from the SQLite
     // polling loop.  The function is async but fire-and-forget from app.js.
     async function sendGestureToRoom(gesture) {
-      if (!_pendingRoomId || _activeRoomStatus !== "active") return;
-      try {
-        const { getFirestore, collection, addDoc, serverTimestamp, getApps, getApp } =
-          await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-        const { initializeApp } =
-          await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-        const { firebaseConfig } = await import("/static/firebase-config.js");
-        const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-        const db  = getFirestore(app);
-        await addDoc(collection(db, "rooms", _pendingRoomId, "messages"), {
-          senderUid:   _currentUid,
-          senderEmail: _currentEmail,
-          text:        gesture,
-          type:        "gesture",
-          timestamp:   serverTimestamp(),
-        });
-      } catch (e) {
-        console.warn("[index] sendGestureToRoom failed:", e.message ?? e);
+      console.log("🤟 [index.html:sendGestureToRoom] Called with gesture:", gesture, "roomId:", _pendingRoomId, "status:", _activeRoomStatus);
+      if (!_pendingRoomId || _activeRoomStatus !== "active") {
+        console.warn("⚠️ [index.html:sendGestureToRoom] Not in active room. Skipping forwarding.");
+        return;
+      }
+      const cleanGesture = (gesture || "").trim();
+      if (!cleanGesture) return;
+
+      const uid = _currentUid || window.currentUid;
+      const email = _currentEmail || window.currentEmail;
+      const res = await sendRoomMessage(_pendingRoomId, uid, email, cleanGesture, "gesture");
+      if (!res.ok) {
+        console.warn("⚠️ [index.html:sendGestureToRoom] Gesture forward failed:", res.error);
       }
     }
 
     // Set/clear window.roomGesture so app.js can call it.
     // app.js guards with typeof === "function", so null is a safe no-op state.
-    function enableRoomGestures()  { window.roomGesture = (g) => sendGestureToRoom(g); }
+    function enableRoomGestures() { window.roomGesture = (g) => sendGestureToRoom(g); }
     function disableRoomGestures() { window.roomGesture = null; }
 
-    window.handleCreateRoom = async function() {
-      const input    = document.getElementById("inviteeEmail");
-      const errEl    = document.getElementById("createRoomError");
-      const btn      = document.getElementById("btnCreateRoom");
-      const email    = input ? input.value.trim() : "";
+    window.handleCreateRoom = async function () {
+      const input = document.getElementById("inviteeEmail");
+      const errEl = document.getElementById("createRoomError");
+      const btn = document.getElementById("btnCreateRoom");
+      const email = input ? input.value.trim() : "";
 
       if (errEl) { errEl.hidden = true; errEl.textContent = ""; }
       if (!email) {
@@ -519,14 +638,14 @@
       }
 
       // Room created — switch to waiting view
-      _pendingRoomId       = result.roomId;
+      _pendingRoomId = result.roomId;
       _pendingInviteeEmail = email;
       if (btn) btn.disabled = false;
 
-      const desc   = document.getElementById("waitingDesc");
-      const idEl   = document.getElementById("waitingRoomId");
-      if (desc)  desc.textContent  = `Invitation sent to ${email}. Waiting for them to accept…`;
-      if (idEl)  idEl.textContent  = result.roomId;
+      const desc = document.getElementById("waitingDesc");
+      const idEl = document.getElementById("waitingRoomId");
+      if (desc) desc.textContent = `Invitation sent to ${email}. Waiting for them to accept…`;
+      if (idEl) idEl.textContent = result.roomId;
       showOnlineView("view-waiting");
 
       // Watch for acceptance
@@ -538,18 +657,18 @@
         } else if (roomData.status === "ended") {
           exitRoomView();
         }
-      }, () => {});
+      }, () => { });
     };
 
     // ── Cancel room handler ───────────────────────────────────────────────
-    window.handleCancelRoom = async function() {
+    window.handleCancelRoom = async function () {
       if (!_pendingRoomId) { showOnlineView("view-lobby"); return; }
       await cancelRoom(_currentUid, _pendingRoomId, _pendingInviteeEmail);
       exitRoomView();
     };
 
     // ── Leave room handler ────────────────────────────────────────────────
-    window.handleLeaveRoom = async function() {
+    window.handleLeaveRoom = async function () {
       if (_pendingRoomId) {
         // Mark room ended so the other participant is also notified
         try {
@@ -558,105 +677,247 @@
           const { initializeApp } =
             await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
           const { firebaseConfig } = await import("/static/firebase-config.js");
-          const app  = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-          const db   = getFirestore(app);
+          const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+          const db = getFirestore(app);
           await updateDoc(doc(db, "rooms", _pendingRoomId), { status: "ended" });
         } catch (e) { console.warn("[index] leave room update failed", e); }
       }
       exitRoomView();
     };
 
+    // ── Send room text reply ──────────────────────────────────────────────
+    window.handleSendRoomMessage = async function (event) {
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      console.log("📝 [index.html:handleSendRoomMessage] Form submitted. RoomId:", _pendingRoomId, "status:", _activeRoomStatus);
+      if (!_pendingRoomId || _activeRoomStatus !== "active") {
+        console.warn("⚠️ [index.html:handleSendRoomMessage] Not in active room!");
+        alert("You are not currently in an active room.");
+        return;
+      }
+
+      const input = document.getElementById("roomChatInput");
+      const btn = document.getElementById("btnSendRoomMessage");
+      const text = input ? input.value.trim() : "";
+
+      if (!text) return;
+      if (text.length > 500) {
+        alert("Message must be 500 characters or fewer.");
+        return;
+      }
+
+      if (btn) btn.disabled = true;
+
+      const uid = _currentUid || window.currentUid;
+      const email = _currentEmail || window.currentEmail;
+
+      const res = await sendRoomMessage(_pendingRoomId, uid, email, text, "text");
+      if (res.ok) {
+        console.log("✅ [index.html:handleSendRoomMessage] Message dispatched successfully!");
+        if (input) {
+          input.value = "";
+          input.focus();
+        }
+      } else {
+        console.error("❌ [index.html:handleSendRoomMessage] Failed to send message:", res.error, res.code);
+        alert("Failed to send message: " + (res.error || "Permission denied or network issue."));
+      }
+
+      if (btn) btn.disabled = false;
+    };
+
+    // ── Helper: escape HTML for safe insertion ───────────────────────────
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // ── Global Invitation Action Handlers ─────────────────────────────────
+    window.handleAcceptInvite = async function (roomId) {
+      if (!roomId) return;
+      const card = document.getElementById(`invite-card-${roomId}`);
+      const btns = card ? card.querySelectorAll("button") : [];
+      btns.forEach(b => b.disabled = true);
+
+      const uid = _currentUid || window.currentUid;
+      const email = _currentEmail;
+
+      try {
+        const res = await acceptInvite(uid, email, roomId);
+        if (res && res.ok) {
+          activateRoomView(roomId);
+
+          // Watch for the room ending
+          listenToRoom(roomId, (roomData) => {
+            if (roomData.status === "ended") {
+              exitRoomView();
+            }
+          }, () => { });
+        } else {
+          alert((res && res.error) || "Could not join room.");
+          btns.forEach(b => b.disabled = false);
+        }
+      } catch (err) {
+        console.error("[index] handleAcceptInvite error:", err);
+        alert("Failed to join room. Please check your connection.");
+        btns.forEach(b => b.disabled = false);
+      }
+    };
+
+    window.handleDeclineInvite = async function (roomId) {
+      if (!roomId) return;
+      const card = document.getElementById(`invite-card-${roomId}`);
+      const btns = card ? card.querySelectorAll("button") : [];
+      btns.forEach(b => b.disabled = true);
+
+      const email = _currentEmail;
+      try {
+        await declineInvite(email, roomId);
+      } catch (err) {
+        console.error("[index] handleDeclineInvite error:", err);
+        btns.forEach(b => b.disabled = false);
+      }
+    };
+
     // ── Render pending invitations ────────────────────────────────────────
     function renderInvites(invites) {
+      console.log("🎨 [index.html:renderInvites] Invoked with raw invites:", invites);
       const listEl = document.getElementById("inviteList");
-      if (!listEl) return;
-      listEl.innerHTML = "";
+      if (!listEl) {
+        console.error("❌ [index.html:renderInvites] DOM target #inviteList NOT FOUND in document!");
+        return;
+      }
+      console.log("🎯 [index.html:renderInvites] DOM target #inviteList successfully found:", listEl);
 
-      if (invites.length === 0) {
+      // Defensively normalize data format (array, QuerySnapshot, or iterable)
+      let inviteList = [];
+      if (Array.isArray(invites)) {
+        inviteList = invites;
+      } else if (invites && Array.isArray(invites.docs)) {
+        inviteList = invites.docs.map(d => ({
+          id: d.id,
+          roomId: (d.data && d.data().roomId) || d.id,
+          ...(typeof d.data === "function" ? d.data() : {})
+        }));
+      } else if (invites && typeof invites.forEach === "function") {
+        invites.forEach(d => {
+          const data = typeof d.data === "function" ? d.data() : d;
+          inviteList.push({
+            id: d.id,
+            roomId: (data && data.roomId) || d.id,
+            ...data
+          });
+        });
+      }
+
+      console.log(`📊 [index.html:renderInvites] Normalized list contains ${inviteList.length} items:`, inviteList);
+
+      if (inviteList.length === 0) {
+        console.log("ℹ️ [index.html:renderInvites] Empty invite list. Setting innerHTML to 'No pending invitations.'");
         listEl.innerHTML = '<p class="online-empty">No pending invitations.</p>';
         return;
       }
 
-      invites.forEach(invite => {
-        const card = document.createElement("div");
-        card.className = "invite-card";
+      const cardsHtml = inviteList.map((invite, idx) => {
+        const roomId = invite.roomId || invite.id || "";
+        const fromUser = invite.invitedBy || "unknown";
 
-        const from = document.createElement("p");
-        from.className = "invite-from";
-        from.textContent = `From: ${invite.invitedBy || "unknown"}`;
-
-        const expires = document.createElement("p");
-        expires.className = "invite-expires";
+        // Format expiresAt safely
+        let expiresHtml = "";
         if (invite.expiresAt) {
           try {
-            // invite.expiresAt is a Firestore Timestamp ({seconds, nanoseconds}).
-            // Convert to milliseconds before passing to Date so the display
-            // is correct regardless of whether the value is a Timestamp object
-            // or (defensively) a plain number/string.
-            const ms = (invite.expiresAt && typeof invite.expiresAt.seconds === "number")
-              ? invite.expiresAt.seconds * 1000
-              : Number(invite.expiresAt);
-            expires.textContent = `Expires: ${new Date(ms).toLocaleString()}`;
-          } catch { expires.textContent = ""; }
+            let dateObj = null;
+            if (typeof invite.expiresAt.toDate === "function") {
+              dateObj = invite.expiresAt.toDate();
+            } else if (typeof invite.expiresAt.seconds === "number") {
+              dateObj = new Date(invite.expiresAt.seconds * 1000);
+            } else if (typeof invite.expiresAt.toMillis === "function") {
+              dateObj = new Date(invite.expiresAt.toMillis());
+            } else {
+              dateObj = new Date(Number(invite.expiresAt));
+            }
+
+            if (dateObj && !isNaN(dateObj.getTime())) {
+              expiresHtml = `<p class="invite-expires">Expires: ${dateObj.toLocaleString()}</p>`;
+            }
+          } catch { expiresHtml = ""; }
         }
 
-        const actions = document.createElement("div");
-        actions.className = "invite-actions";
+        console.log(`🃏 [index.html:renderInvites] Card [${idx}]: roomId="${roomId}", from="${fromUser}"`);
+        return `
+          <div class="invite-card" id="invite-card-${escapeHtml(roomId)}">
+            <p class="invite-from">From: <strong>${escapeHtml(fromUser)}</strong></p>
+            ${expiresHtml}
+            <div class="invite-actions">
+              <button class="btn btn-start invite-btn" onclick="handleAcceptInvite('${escapeHtml(roomId)}')">Accept</button>
+              <button class="btn btn-stop invite-btn" onclick="handleDeclineInvite('${escapeHtml(roomId)}')">Decline</button>
+            </div>
+          </div>
+        `;
+      }).join("");
 
-        const acceptBtn = document.createElement("button");
-        acceptBtn.className   = "btn btn-start invite-btn";
-        acceptBtn.textContent = "Accept";
-        acceptBtn.onclick     = async () => {
-          acceptBtn.disabled  = true;
-          const res = await acceptInvite(_currentUid, _currentEmail, invite.roomId);
-          if (res.ok) {
-            activateRoomView(invite.roomId);
-
-            // Watch for the room ending
-            listenToRoom(invite.roomId, (roomData) => {
-              if (roomData.status === "ended") {
-                exitRoomView();
-              }
-            }, () => {});
-          } else {
-            alert(res.error || "Could not join room.");
-            acceptBtn.disabled = false;
-          }
-        };
-
-        const declineBtn = document.createElement("button");
-        declineBtn.className   = "btn btn-stop invite-btn";
-        declineBtn.textContent = "Decline";
-        declineBtn.onclick     = async () => {
-          declineBtn.disabled = true;
-          await declineInvite(_currentEmail, invite.roomId);
-        };
-
-        actions.appendChild(acceptBtn);
-        actions.appendChild(declineBtn);
-        card.appendChild(from);
-        card.appendChild(expires);
-        card.appendChild(actions);
-        listEl.appendChild(card);
-      });
+      listEl.innerHTML = cardsHtml;
+      console.log(`✅ [index.html:renderInvites] Updated #inviteList with ${inviteList.length} cards. DOM child count: ${listEl.children.length}`);
     }
+
+    // Expose helpers globally on window for easy console debugging and access
+    window.renderInvites = renderInvites;
+    window.listenForInvitations = listenForInvitations;
 
     // ── Auth guard ────────────────────────────────────────────────────────
     guardPage(async (user) => {
+      console.log("🔐 [index.html:guardPage] Auth confirmed! User email:", user.email, "UID:", user.uid);
       document.body.style.visibility = "visible";
       showAuthUser(document.getElementById("userEmail"));
 
-      _currentUid   = user.uid;
+      _currentUid = user.uid;
       _currentEmail = user.email;
       window.currentUid = user.uid;
 
-      // ── Local Translation: SQLite baseline + Firestore history ──────────
-      await initSqliteBaseline();
+      // ── Online Communication: invitation listener (run immediately) ─────
+      const listEl = document.getElementById("inviteList");
+      if (listEl) {
+        listEl.innerHTML = '<p class="online-empty">Connecting to invitations…</p>';
+      }
 
-      window.firestoreMirror = function(sqliteId, gesture, timestamp, confidence) {
+      console.log("📡 [index.html:guardPage] Starting listenForInvitations immediately for:", user.email);
+      listenForInvitations(
+        user.email,
+        (invites) => {
+          console.log("📬 [index.html:listenForInvitations callback] Received invites payload:", invites);
+          renderInvites(invites);
+        },
+        (err) => {
+          console.error("❌ [index.html:listenForInvitations error callback]:", err.code, err.message, err);
+          if (listEl) {
+            const isPerm = err.code === "permission-denied";
+            listEl.innerHTML = `
+              <div class="online-empty" style="color: #ff6b6b; text-align: left; padding: 0.5rem;">
+                <p><strong>Error loading invitations:</strong> ${escapeHtml(err.code || err.message)}</p>
+                ${isPerm ? '<p style="font-size: 0.85em; margin-top: 4px; color: #ff9999;">Firestore permission denied. Please verify that firestore.rules allows list access on invitations.</p>' : ''}
+              </div>
+            `;
+          }
+        }
+      );
+
+      // ── Local Translation: SQLite baseline + Firestore history ──────────
+      try {
+        await initSqliteBaseline();
+      } catch (baseErr) {
+        console.warn("[index.html:guardPage] initSqliteBaseline error:", baseErr);
+      }
+
+      window.firestoreMirror = function (sqliteId, gesture, timestamp, confidence) {
         mirrorTranslation(user.uid, sqliteId, gesture, timestamp, confidence);
       };
-      window.firestoreClearHistory = function() {
+      window.firestoreClearHistory = function () {
         return clearUserHistory(user.uid);
       };
 
@@ -676,13 +937,6 @@
           }
         }
       );
-
-      // ── Online Communication: invitation listener ───────────────────────
-      listenForInvitations(
-        user.email,
-        (invites) => { renderInvites(invites); },
-        () => { /* permission-denied when no invites exist — normal */ }
-      );
     });
 
     // ── Cleanup on unload / sign-out ──────────────────────────────────────
@@ -692,7 +946,7 @@
       disableRoomGestures();
     });
 
-    window.handleSignOut = async function() {
+    window.handleSignOut = async function () {
       unsubscribeHistory();
       unsubscribeRoom();
       disableRoomGestures();
@@ -701,4 +955,5 @@
   </script>
 
 </body>
+
 </html>

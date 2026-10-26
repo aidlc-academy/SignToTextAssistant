@@ -933,7 +933,191 @@ body {
 }
 
 .room-placeholder-icon { font-size: 3rem; opacity: 0.35; }
-.room-placeholder-hint { font-size: 0.8rem; opacity: 0.6; }
+/* ── Active Room Split Layout (Camera Left / Chat Right) ─────────────────── */
+#activeRoom,
+.room-split-layout {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 1.5rem;
+  padding: 1.5rem 2rem;
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  align-items: stretch;
+  min-height: 560px;
+  height: calc(100vh - 180px);
+  box-sizing: border-box;
+}
+
+/* Common card behavior in split layout */
+.room-camera-card,
+.room-chat-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Left Column: Room camera card & video wrapper */
+.room-video-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #0a0c14;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--clr-border);
+}
+
+.room-video-wrapper video,
+.room-video-wrapper canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 10px;
+}
+
+.room-camera-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 0.5rem;
+}
+
+.room-gesture-pill-box {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--clr-muted);
+}
+
+.room-gesture-caption {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.gesture-label-sm {
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.2rem 0.65rem;
+  border-radius: 99px;
+  letter-spacing: 0.03em;
+  background: var(--clr-surface-2);
+  border: 1px solid var(--clr-border);
+  color: var(--clr-muted);
+  transition: all 0.2s ease;
+}
+
+.gesture-label-sm.state-known {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: var(--clr-green);
+}
+
+.gesture-label-sm.state-none {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--clr-border);
+  color: var(--clr-muted);
+}
+
+.gesture-label-sm.state-unknown {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+/* Right Column: Room Chat Panel */
+.room-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.room-voice-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.room-voice-controls .btn-voice {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  border-radius: 6px;
+}
+
+.room-voice-controls .voice-select {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8rem;
+}
+
+.room-voice-controls .voice-label {
+  font-size: 0.8rem;
+}
+
+/* Messages container inside chat card */
+.room-chat-card .room-messages-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Scrollable message list — scrolls independently! */
+.room-chat-card .room-messages-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: none;
+  min-height: 0;
+  padding: 0.5rem 0.5rem 0.5rem 0.25rem;
+  scroll-behavior: smooth;
+}
+
+/* Input form pinned cleanly to bottom */
+.room-chat-card .room-chat-form {
+  flex-shrink: 0;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--clr-border);
+}
+
+/* Responsive adjustments */
+@media (max-width: 880px) {
+  #activeRoom,
+  .room-split-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 0;
+    padding: 1rem;
+    gap: 1.25rem;
+  }
+  .room-camera-card,
+  .room-chat-card {
+    height: auto;
+    min-height: 0;
+  }
+  .room-chat-card .room-messages-list {
+    max-height: 420px;
+    min-height: 240px;
+  }
+}
 
 /* ── Room messages display ───────────────────────────────────────────────── */
 .room-messages-container {
@@ -1042,3 +1226,56 @@ body {
   color: var(--clr-green);
   letter-spacing: 0.02em;
 }
+
+.room-msg--text .room-msg-badge {
+  background: rgba(108, 99, 255, 0.18);
+  color: #a78bfa;
+}
+
+.room-msg--text .room-msg-text {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--clr-text);
+  letter-spacing: normal;
+  word-break: break-word;
+}
+
+/* ── Room chat reply form ─────────────────────────────────────────────────── */
+.room-chat-form {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--clr-border);
+  align-items: center;
+}
+
+.room-chat-input {
+  flex: 1;
+  background: var(--clr-surface-2);
+  color: var(--clr-text);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.95rem;
+  font-size: 0.92rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.room-chat-input:focus {
+  border-color: var(--clr-accent);
+  box-shadow: 0 0 0 3px var(--clr-accent-glow);
+}
+
+.room-chat-input::placeholder {
+  color: var(--clr-muted);
+  opacity: 0.6;
+}
+
+.room-chat-btn {
+  flex: 0 0 auto;
+  min-width: 90px;
+  padding: 0.65rem 1.25rem;
+}
+
